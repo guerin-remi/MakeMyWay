@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunMyWay - Générateur de parcours</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Modern CSS -->
+    <link rel="stylesheet" href="assets/css/styles.css">
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <div class="app-container">
+        <!-- Sidebar Panel -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-running"></i>
+                    <h1>RunMyWay</h1>
+                </div>
+                <p class="tagline">Générateur de parcours personnalisés</p>
+                
+                <!-- Mobile close button -->
+                <button class="sidebar-close" id="sidebarClose" aria-label="Fermer">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- Instructions Card -->
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Comment utiliser</h3>
+                    </div>
+                    <div class="info-card-content">
+                        <p>Cliquez sur la carte pour définir votre départ ou saisissez une adresse. Clic droit pour supprimer un marqueur.</p>
+                    </div>
+                </div>
+
+                <!-- Start Point Section -->
+                <section class="form-section accordion-section">
+                    <div class="section-header accordion-header" data-target="start-section">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <h3>Point de départ</h3>
+                        <i class="fas fa-chevron-down accordion-chevron"></i>
+                    </div>
+                    <div class="accordion-content" id="start-section">
+                        <div class="form-group">
+                            <label for="startAddress">Adresse de départ</label>
+                            <div class="input-with-icon">
+                                <input type="text" id="startAddress" placeholder="Ex: Place de la République, Paris">
+                                <i class="fas fa-location-dot"></i>
+                            </div>
+                            <div class="address-suggestions" id="startAddressSuggestions"></div>
+                        </div>
+                        <button class="btn btn-secondary btn-block" id="useLocationBtn">
+                            <i class="fas fa-crosshairs"></i>
+                            Utiliser ma position
+                        </button>
+                    </div>
+                </section>
+
+                <!-- End Point Section -->
+                <section class="form-section accordion-section">
+                    <div class="section-header accordion-header" data-target="end-section">
+                        <i class="fas fa-map-marker"></i>
+                        <h3>Point d'arrivée</h3>
+                        <span class="section-hint">(optionnel - retour au départ par défaut)</span>
+                        <i class="fas fa-chevron-down accordion-chevron"></i>
+                    </div>
+                    <div class="accordion-content collapsed" id="end-section">
+                        <div class="form-group">
+                            <label for="endAddress">Adresse d'arrivée</label>
+                            <div class="input-with-icon">
+                                <input type="text" id="endAddress" placeholder="Ex: Gare du Nord, Paris">
+                                <i class="fas fa-flag-checkered"></i>
+                            </div>
+                            <div class="address-suggestions" id="endAddressSuggestions"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="returnToStart" checked>
+                                <span class="checkmark"></span>
+                                Revenir au point de départ
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- POI Categories Section -->
+                <section class="form-section accordion-section">
+                    <div class="section-header accordion-header" data-target="poi-section">
+                        <i class="fas fa-map-pin"></i>
+                        <h3>Catégories de points d'intérêt</h3>
+                        <i class="fas fa-chevron-down accordion-chevron"></i>
+                    </div>
+                    <div class="accordion-content collapsed" id="poi-section">
+                        <div class="poi-grid" id="poiCheckboxes">
+                            <!-- POI categories will be generated here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Custom POI Section -->
+                <section class="form-section accordion-section">
+                    <div class="section-header accordion-header" data-target="custom-poi-section">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Ajouter un lieu spécifique</h3>
+                        <i class="fas fa-chevron-down accordion-chevron"></i>
+                    </div>
+                    <div class="accordion-content collapsed" id="custom-poi-section">
+                        <div class="form-group">
+                            <label for="poiInput">Lieu personnalisé</label>
+                            <div class="input-with-button">
+                                <input type="text" id="poiInput" placeholder="Ex: Tour Eiffel, Parc des Buttes-Chaumont">
+                                <button type="button" id="addPOIBtn" class="btn btn-secondary btn-icon">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div class="poi-suggestions" id="poiSuggestions"></div>
+                        </div>
+                        <div class="poi-chips" id="poiChips"></div>
+                    </div>
+                </section>
+
+                <!-- Route Settings Section - Always visible -->
+                <section class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <h3>Paramètres du parcours</h3>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="targetDistance">Distance cible (km)</label>
+                            <div class="input-with-icon">
+                                <input type="number" id="targetDistance" value="5" min="1" max="50" step="0.5">
+                                <i class="fas fa-ruler"></i>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="travelMode">Mode de déplacement</label>
+                            <div class="select-wrapper">
+                                <select id="travelMode">
+                                    <option value="foot">🏃 Course/Marche</option>
+                                    <option value="cycling">🚴 Vélo</option>
+                                </select>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-primary btn-block btn-lg" id="generateBtn">
+                        <i class="fas fa-route"></i>
+                        Générer le parcours
+                    </button>
+                    <button class="btn btn-outline btn-block" id="resetBtn">
+                        <i class="fas fa-redo"></i>
+                        Réinitialiser
+                    </button>
+                </div>
+
+                <!-- Results Section -->
+                <section class="results-section" id="resultsSection" style="display: none;">
+                    <div class="results-header">
+                        <i class="fas fa-chart-line"></i>
+                        <h3>Résultats du parcours</h3>
+                    </div>
+                    <div class="results-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">Distance</div>
+                            <div class="stat-value" id="distanceResult">-</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Durée estimée</div>
+                            <div class="stat-value" id="durationResult">-</div>
+                        </div>
+                    </div>
+                    <div class="route-explanation" id="routeExplanation"></div>
+                    <button class="btn btn-success btn-block" id="exportBtn">
+                        <i class="fas fa-download"></i>
+                        Exporter GPX
+                    </button>
+                </section>
+
+                <!-- Loading -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Génération du parcours en cours...</p>
+                    </div>
+                </div>
+
+                <!-- Error Messages -->
+                <div class="alert alert-error" id="errorAlert" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span id="errorMessage"></span>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="sidebar-footer">
+                <p>Données © <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a></p>
+                <p>Calcul via <a href="https://project-osrm.org" target="_blank">OSRM</a></p>
+            </footer>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="map-container">
+            <div id="map" class="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <button class="map-control-btn" id="fullscreenBtn" title="Plein écran">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="map-control-btn" id="centerMapBtn" title="Centrer sur le parcours">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Floating Controls -->
+            <div class="mobile-floating-controls">
+                <!-- Status Indicator -->
+                <div class="status-indicator" id="statusIndicator">
+                    <div class="status-content">
+                        <span class="status-text">Cliquez pour ajouter un point de départ</span>
+                        <div class="status-progress" id="statusProgress"></div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions Toolbar -->
+                <div class="quick-actions-toolbar" id="quickActionsToolbar">
+                    <button class="quick-action-btn" id="quickResetBtn" title="Réinitialiser">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                    <button class="quick-action-btn" id="quickLocationBtn" title="Ma position">
+                        <i class="fas fa-location-arrow"></i>
+                    </button>
+                    <button class="quick-action-btn" id="quickSettingsBtn" title="Paramètres">
+                        <i class="fas fa-sliders-h"></i>
+                    </button>
+                </div>
+
+                <!-- Floating Action Button -->
+                <div class="fab-container">
+                    <button class="fab" id="mainFAB">
+                        <i class="fab-icon fas fa-route"></i>
+                        <span class="fab-text">Générer</span>
+                    </button>
+                    
+                    <!-- FAB Menu -->
+                    <div class="fab-menu" id="fabMenu">
+                        <button class="fab-menu-item" id="fabGenerate">
+                            <i class="fas fa-route"></i>
+                            <span>Générer parcours</span>
+                        </button>
+                        <button class="fab-menu-item" id="fabPOI">
+                            <i class="fas fa-map-pin"></i>
+                            <span>Choisir POI</span>
+                        </button>
+                        <button class="fab-menu-item" id="fabSettings">
+                            <i class="fas fa-cog"></i>
+                            <span>Paramètres</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Settings Panel (Mobile) -->
+            <div class="mini-settings-panel" id="miniSettingsPanel">
+                <div class="mini-settings-header">
+                    <h4>Paramètres rapides</h4>
+                    <button class="mini-settings-close" id="miniSettingsClose">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="mini-settings-content">
+                    <div class="mini-setting-item">
+                        <label>Distance (km)</label>
+                        <input type="range" id="quickDistanceSlider" min="1" max="20" value="5" step="0.5">
+                        <span id="quickDistanceValue">5 km</span>
+                    </div>
+                    <div class="mini-setting-item">
+                        <label>Mode</label>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" data-mode="foot">
+                                <i class="fas fa-running"></i>
+                            </button>
+                            <button class="mode-btn" data-mode="cycling">
+                                <i class="fas fa-bicycle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mini-setting-item">
+                        <label>POI rapides</label>
+                        <div class="quick-poi-buttons">
+                            <button class="quick-poi-btn" data-category="parc">🌳</button>
+                            <button class="quick-poi-btn" data-category="monument">🏛️</button>
+                            <button class="quick-poi-btn" data-category="eau">💧</button>
+                            <button class="quick-poi-btn" data-category="culture">🎭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Bottom Sheet for Results -->
+            <div class="bottom-sheet" id="mobileResults">
+                <div class="bottom-sheet-handle"></div>
+                <div class="bottom-sheet-content">
+                    <div class="bottom-sheet-header">
+                        <h3>Résultats</h3>
+                        <button class="bottom-sheet-close" id="closeBottomSheet">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="mobileResultsContent">
+                        <!-- Content will be copied from desktop results -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Overlay for mobile menu -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
