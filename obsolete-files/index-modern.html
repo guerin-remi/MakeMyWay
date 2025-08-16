@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RunMyWay - Générateur de parcours personnalisés pour la course à pied, marche et vélo. Interface moderne et intuitive.">
+    <meta name="keywords" content="parcours running, course à pied, générateur itinéraire, sport, vélo, marche, moderne">
+    <meta name="author" content="RunMyWay">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#6366f1">
+    
+    <title>RunMyWay - Générateur de parcours modernes</title>
+    
+    <!-- Preconnect pour performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <!-- Police moderne Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS moderne -->
+    <link rel="stylesheet" href="assets/css/modern-core.css">
+    <link rel="stylesheet" href="assets/css/modern-components.css">
+    <link rel="stylesheet" href="assets/css/modern-map.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    
+    <!-- Font Awesome pour icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous">
+</head>
+<body>
+    <!-- Skip link pour accessibilité -->
+    <a href="#map" class="visually-hidden">Aller au contenu principal</a>
+    
+    <div class="app-container">
+        <!-- Sidebar moderne -->
+        <aside class="sidebar" role="complementary" aria-label="Configuration du parcours">
+            <!-- Header avec gradient -->
+            <header class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-running" aria-hidden="true"></i>
+                    <h1>RunMyWay</h1>
+                </div>
+                <p class="tagline">Générateur de parcours modernes</p>
+            </header>
+
+            <!-- Contenu de la sidebar -->
+            <div class="sidebar-content">
+                
+                <!-- Section Itinéraire -->
+                <section class="form-section">
+                    <div class="section-divider">
+                        <span class="section-label">
+                            <i class="fas fa-route"></i>
+                            Itinéraire
+                        </span>
+                        <button class="btn btn-ghost btn-icon" id="routeHelpBtn" type="button" aria-label="Aide sur l'itinéraire">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Bulle d'aide moderne -->
+                    <div class="help-bubble" id="routeHelpBubble" style="display: none;" role="tooltip">
+                        <div class="help-content">
+                            <h3 class="help-title">
+                                <i class="fas fa-lightbulb"></i>
+                                Comment placer vos points
+                            </h3>
+                            <div class="help-tips">
+                                <div class="help-tip">
+                                    <i class="fas fa-mouse-pointer help-tip-icon"></i>
+                                    <span class="help-tip-text"><strong>Cliquer</strong> sur la carte pour placer les points</span>
+                                </div>
+                                <div class="help-tip">
+                                    <i class="fas fa-hand-rock help-tip-icon"></i>
+                                    <span class="help-tip-text"><strong>Glisser-déposer</strong> pour déplacer un point</span>
+                                </div>
+                                <div class="help-tip">
+                                    <i class="fas fa-mouse help-tip-icon"></i>
+                                    <span class="help-tip-text"><strong>Clic droit</strong> sur un point pour le supprimer</span>
+                                </div>
+                                <div class="help-tip">
+                                    <i class="fas fa-crosshairs help-tip-icon"></i>
+                                    <span class="help-tip-text"><strong>Géolocalisation</strong> pour votre position actuelle</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Inputs d'adresse modernes -->
+                    <div class="input-group">
+                        <label for="startAddress" class="input-label">Point de départ</label>
+                        <div class="input-with-icon">
+                            <input type="text" id="startAddress" class="input" placeholder="Cliquez sur la carte ou tapez une adresse">
+                            <i class="fas fa-circle icon" style="color: var(--success);"></i>
+                        </div>
+                        <div class="input-actions" style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
+                            <button class="btn btn-ghost btn-sm" id="useLocationBtn" type="button">
+                                <i class="fas fa-crosshairs"></i>
+                                Ma position
+                            </button>
+                            <button class="btn btn-ghost btn-sm" id="clearStartBtn" type="button" style="display: none;">
+                                <i class="fas fa-times"></i>
+                                Effacer
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="endAddress" class="input-label">Point d'arrivée (optionnel)</label>
+                        <div class="input-with-icon">
+                            <input type="text" id="endAddress" class="input" placeholder="Laissez vide pour un parcours en boucle">
+                            <i class="fas fa-flag-checkered icon" style="color: var(--error);"></i>
+                        </div>
+                        <div class="input-actions" style="margin-top: var(--space-sm);">
+                            <button class="btn btn-ghost btn-sm" id="clearEndBtn" type="button" style="display: none;">
+                                <i class="fas fa-times"></i>
+                                Effacer
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Toggle moderne pour retour au départ -->
+                    <div style="margin-top: var(--space-xl);">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="returnToStart" class="toggle-input">
+                            <span class="toggle-label">Retour automatique au point de départ</span>
+                        </label>
+                        <div class="route-status" id="routeStatus" style="margin-top: var(--space-md); font-size: var(--text-sm); color: var(--text-secondary);">
+                            Cliquez sur la carte pour définir votre point de départ
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section Paramètres -->
+                <section class="form-section">
+                    <div class="section-divider">
+                        <span class="section-label">
+                            <i class="fas fa-cogs"></i>
+                            Paramètres
+                        </span>
+                    </div>
+                    
+                    <!-- Mode de transport moderne -->
+                    <div class="input-group">
+                        <label class="input-label">Mode de déplacement</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="mode-walking" name="travelMode" value="walking" class="radio-input" checked>
+                                <label for="mode-walking" class="radio-label">
+                                    <i class="fas fa-walking radio-icon"></i>
+                                    <span>Marche</span>
+                                </label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="mode-running" name="travelMode" value="running" class="radio-input">
+                                <label for="mode-running" class="radio-label">
+                                    <i class="fas fa-running radio-icon"></i>
+                                    <span>Course</span>
+                                </label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="mode-cycling" name="travelMode" value="cycling" class="radio-input">
+                                <label for="mode-cycling" class="radio-label">
+                                    <i class="fas fa-bicycle radio-icon"></i>
+                                    <span>Vélo</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Slider de distance moderne -->
+                    <div class="input-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+                            <label for="targetDistance" class="input-label" style="margin: 0;">Distance cible</label>
+                            <span id="distanceValue" style="font-weight: var(--font-weight-semibold); color: var(--primary-color);">5 km</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="targetDistance" class="slider" min="1" max="10" value="5" step="0.5">
+                            <div class="slider-labels">
+                                <span>1km</span>
+                                <span id="maxLabel">10km</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section Points d'intérêt (simplifiée) -->
+                <section class="form-section">
+                    <div class="section-divider">
+                        <span class="section-label">
+                            <i class="fas fa-map-marker-alt"></i>
+                            Points d'intérêt
+                        </span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="poiInput" class="input-label">Ajouter un lieu d'intérêt</label>
+                        <div style="display: flex; gap: var(--space-sm);">
+                            <input type="text" id="poiInput" class="input" placeholder="Ex: Tour Eiffel, parc, musée..." style="flex: 1;">
+                            <button type="button" id="addPOIBtn" class="btn btn-secondary btn-icon">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div id="poiSuggestions" class="suggestions" style="display: none;"></div>
+                    </div>
+                    
+                    <div id="poiChips" class="poi-chips" style="display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-md);"></div>
+                </section>
+
+                <!-- Actions -->
+                <div style="margin-top: var(--space-4xl);">
+                    <button class="btn btn-primary btn-full btn-lg" id="generateBtn" type="button">
+                        <i class="fas fa-play"></i>
+                        <span>Générer le parcours</span>
+                    </button>
+                    <div style="display: flex; justify-content: center; margin-top: var(--space-md);">
+                        <button class="btn btn-ghost" id="resetBtn" type="button">
+                            <i class="fas fa-refresh"></i>
+                            Réinitialiser
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Section Résultats -->
+                <div class="results-section" id="resultsSection">
+                    <div class="success-banner">
+                        <i class="fas fa-check-circle icon"></i>
+                        <span>Parcours généré avec succès !</span>
+                    </div>
+                    
+                    <div class="results-grid">
+                        <div class="result-stat">
+                            <span class="result-stat-value" id="distanceResult">-</span>
+                            <span class="result-stat-label">Distance</span>
+                        </div>
+                        <div class="result-stat">
+                            <span class="result-stat-value" id="durationResult">-</span>
+                            <span class="result-stat-label">Durée</span>
+                        </div>
+                        <div class="result-stat">
+                            <span class="result-stat-value" id="deviationResult">-</span>
+                            <span class="result-stat-label">Écart</span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-actions">
+                        <button class="export-btn" id="exportBtn" type="button">
+                            <i class="fas fa-download icon"></i>
+                            <span>Exporter GPX</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading overlay -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner icon"></i>
+                        <p class="loading-text">Génération du parcours en cours...</p>
+                    </div>
+                </div>
+
+                <!-- Messages d'erreur -->
+                <div id="errorAlert" class="alert alert-error" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span id="errorMessage"></span>
+                </div>
+                
+            </div>
+
+            <!-- Footer moderne -->
+            <footer style="padding: var(--space-xl); border-top: 1px solid var(--border-light); font-size: var(--text-xs); color: var(--text-tertiary); text-align: center;">
+                <p>Données © <a href="https://openstreetmap.org" target="_blank" style="color: var(--primary-color);">OpenStreetMap</a></p>
+                <p style="margin-top: var(--space-xs);">Calcul via <a href="https://project-osrm.org" target="_blank" style="color: var(--primary-color);">OSRM</a></p>
+            </footer>
+        </aside>
+
+        <!-- Container de carte moderne -->
+        <main class="map-container" role="main" aria-label="Carte interactive">
+            <div id="map" class="map" role="application" aria-label="Carte interactive pour la génération de parcours"></div>
+            
+            <!-- Panel d'informations du parcours -->
+            <div class="route-info-panel" id="routeInfoPanel">
+                <div class="route-info-header">
+                    <div class="route-info-icon">
+                        <i class="fas fa-route"></i>
+                    </div>
+                    <h3 class="route-info-title">Informations du parcours</h3>
+                </div>
+                <div class="route-info-stats">
+                    <div class="route-stat">
+                        <span class="route-stat-value" id="routeDistance">-</span>
+                        <span class="route-stat-label">Distance</span>
+                    </div>
+                    <div class="route-stat">
+                        <span class="route-stat-value" id="routeDuration">-</span>
+                        <span class="route-stat-label">Durée</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contrôles de carte flottants -->
+            <div class="map-controls">
+                <button class="map-control-btn" id="fullscreenBtn" type="button" aria-label="Plein écran">
+                    <i class="fas fa-expand icon"></i>
+                </button>
+                <button class="map-control-btn" id="centerMapBtn" type="button" aria-label="Centrer sur le parcours">
+                    <i class="fas fa-crosshairs icon"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/modern-ui.js"></script>
+    
+</body>
+</html>
