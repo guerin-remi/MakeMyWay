@@ -1,6 +1,6 @@
 {
-  "name": "RunMyWay - Générateur de parcours",
-  "short_name": "RunMyWay",
+  "name": "MakeMyWay - Générateur de parcours",
+  "short_name": "MakeMyWay",
   "description": "Interface moderne pour la génération de parcours sportifs personnalisés",
   "icons": [
     {

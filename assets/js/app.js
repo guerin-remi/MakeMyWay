@@ -1,8 +1,8 @@
 /**
- * RunMyWay - Application de génération de parcours
+ * MakeMyWay - Application de génération de parcours
  */
 
-class RunMyWayApp {
+class MakeMyWayApp {
     constructor() {
         this.map = null;
         this.markers = [];
@@ -10,6 +10,13 @@ class RunMyWayApp {
         this.startPoint = null;
         this.endPoint = null;
         this.pois = [];
+        
+        // Cache pour optimiser les performances
+        this.routeCache = new Map();
+        this.snapCache = new Map();
+        
+        // Nettoyage automatique du cache (toutes les 10 minutes)
+        setInterval(() => this.cleanupCache(), 10 * 60 * 1000);
         
         // Configuration POI
         this.poiCategories = [
@@ -21,7 +28,7 @@ class RunMyWayApp {
     }
 
     async init() {
-        console.log('🚀 Initialisation de RunMyWay...');
+        console.log('🚀 Initialisation de MakeMyWay...');
         
         try {
             this.initializeMap();
@@ -29,7 +36,7 @@ class RunMyWayApp {
             this.setupAutocomplete();
             this.setupUI();
             
-            console.log('✅ RunMyWay initialisé avec succès');
+            console.log('✅ MakeMyWay initialisé avec succès');
         } catch (error) {
             console.error('❌ Erreur lors de l\'initialisation:', error);
             this.showError('Erreur lors de l\'initialisation de l\'application');
@@ -1671,6 +1678,8 @@ class RunMyWayApp {
         
         console.log(`Mode ${mode}: Recherche de ${numWaypoints} points de passage dans un rayon de ${radiusKm.toFixed(1)}km (distance cible: ${targetDistance}km)`);
         
+        // Générer tous les points candidats d'abord
+        const candidatePoints = [];
         for (let i = 0; i < numWaypoints; i++) {
             const angle = (i / numWaypoints) * 2 * Math.PI;
             
@@ -1687,13 +1696,21 @@ class RunMyWayApp {
             const lat = center.lat + Math.cos(finalAngle) * currentRadius;
             const lng = center.lng + Math.sin(finalAngle) * currentRadius;
             
-            // Trouver un point routier proche
-            const snapPoint = await this.snapToRoad(L.latLng(lat, lng), mode);
-            if (snapPoint) {
-                waypoints.push(snapPoint);
-                
-                // Délai pour éviter de surcharger l'API
-                await new Promise(resolve => setTimeout(resolve, 100));
+            candidatePoints.push(L.latLng(lat, lng));
+        }
+        
+        // Traitement en parallèle avec limitation
+        const batchSize = 3; // Traiter par batch de 3 pour éviter surcharge API
+        for (let i = 0; i < candidatePoints.length; i += batchSize) {
+            const batch = candidatePoints.slice(i, i + batchSize);
+            const snapPromises = batch.map(point => this.snapToRoad(point, mode));
+            
+            const snapResults = await Promise.all(snapPromises);
+            waypoints.push(...snapResults.filter(point => point !== null));
+            
+            // Petit délai entre les batchs
+            if (i + batchSize < candidatePoints.length) {
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
         }
         
@@ -1702,24 +1719,39 @@ class RunMyWayApp {
     }
 
     /**
-     * Trouve le point routier le plus proche
+     * Trouve le point routier le plus proche avec cache
      */
     async snapToRoad(point, mode) {
+        // Clé de cache basée sur position arrondie (précision 100m)
+        const lat = Math.round(point.lat * 1000) / 1000;
+        const lng = Math.round(point.lng * 1000) / 1000;
+        const cacheKey = `${mode}_${lat}_${lng}`;
+        
+        // Vérifier le cache
+        if (this.snapCache.has(cacheKey)) {
+            return this.snapCache.get(cacheKey);
+        }
+        
         try {
             const url = `https://router.project-osrm.org/nearest/v1/${mode}/${point.lng},${point.lat}?number=1`;
             
             const response = await fetch(url);
             const data = await response.json();
             
+            let result = point; // Point original par défaut
             if (data.code === 'Ok' && data.waypoints && data.waypoints.length > 0) {
                 const wp = data.waypoints[0];
-                return L.latLng(wp.location[1], wp.location[0]);
+                result = L.latLng(wp.location[1], wp.location[0]);
             }
+            
+            // Mettre en cache
+            this.snapCache.set(cacheKey, result);
+            return result;
+            
         } catch (error) {
             console.warn('Erreur snap to road:', error);
+            return point; // Retourner le point original en cas d'erreur
         }
-        
-        return point; // Retourner le point original en cas d'erreur
     }
 
     /**
@@ -2261,6 +2293,27 @@ class RunMyWayApp {
         
         console.error('Erreur:', message);
     }
+
+    /**
+     * Nettoie le cache pour éviter l'accumulation
+     */
+    cleanupCache() {
+        const maxCacheSize = 100;
+        
+        if (this.snapCache.size > maxCacheSize) {
+            const keys = Array.from(this.snapCache.keys());
+            const keysToDelete = keys.slice(0, keys.length - maxCacheSize);
+            keysToDelete.forEach(key => this.snapCache.delete(key));
+            console.log(`🧹 Cache nettoyé: ${keysToDelete.length} entrées supprimées`);
+        }
+        
+        if (this.routeCache.size > maxCacheSize) {
+            const keys = Array.from(this.routeCache.keys());
+            const keysToDelete = keys.slice(0, keys.length - maxCacheSize);
+            keysToDelete.forEach(key => this.routeCache.delete(key));
+            console.log(`🧹 Cache routes nettoyé: ${keysToDelete.length} entrées supprimées`);
+        }
+    }
 }
 
 // Initialisation de l'application
@@ -2272,8 +2325,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    window.runMyWayApp = new RunMyWayApp();
+    window.runMyWayApp = new MakeMyWayApp();
     window.runMyWayApp.init();
 });
 
-console.log('📦 Script RunMyWay chargé');
+console.log('📦 Script MakeMyWay chargé');
