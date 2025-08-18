@@ -490,5 +490,18 @@ if (document.readyState === 'loading') {
 // Export pour utilisation en tant que module
 export { MakeMyWayApp, initializeMakeMyWay };
 
+// Enregistrement du Service Worker pour la PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/Runway-1/service-worker.js')
+      .then(registration => {
+        console.log('PWA: ServiceWorker enregistré avec succès. Scope:', registration.scope);
+      })
+      .catch(err => {
+        console.error('PWA: Echec de l\'enregistrement du ServiceWorker:', err);
+      });
+  });
+}
+
 // Log de chargement du script
 console.log('📦 Module principal MakeMyWay chargé');

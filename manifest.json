@@ -4,23 +4,23 @@
   "description": "Interface moderne pour la génération de parcours sportifs personnalisés",
   "icons": [
     {
-      "src": "favicon.svg",
+      "src": "/Runway-1/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "favicon-192.png",
+      "src": "/Runway-1/favicon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "favicon-512.png",
+      "src": "/Runway-1/favicon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "start_url": "/",
+  "start_url": "/Runway-1/",
   "display": "standalone",
   "theme_color": "#6366f1",
   "background_color": "#f8fafc",
