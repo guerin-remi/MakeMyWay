@@ -1,0 +1,96 @@
+/* ==========================================================================
+   MakeMyWay - Styles des panneaux de résultats
+   ========================================================================== */
+
+/* Results panel */
+.results-panel {
+    position: fixed;
+    bottom: var(--space-4);
+    right: var(--space-4);
+    z-index: 1000;
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-xl);
+    min-width: 280px;
+    display: none;
+}
+
+.results-panel.show {
+    display: block;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+    color: var(--success);
+}
+
+.results-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--space-1);
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    display: none;
+}
+
+.results-close:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.result-stat {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .results-close {
+        display: block;
+    }
+
+    .results-panel {
+        left: var(--space-2);
+        right: var(--space-2);
+        top: 80px;
+        bottom: auto;
+        min-width: auto;
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+
+    .results-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+    }
+}
