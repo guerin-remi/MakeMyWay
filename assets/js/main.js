@@ -1,0 +1,494 @@
+/**
+ * MakeMyWay - Point d'entrée principal de l'application
+ * Architecture modulaire avec séparation des responsabilités
+ */
+
+import { CONFIG } from './config.js';
+import { ApiService } from './modules/ApiService.js';
+import { MapManager } from './modules/MapManager.js';
+import { RouteGenerator } from './modules/RouteGenerator.js';
+import { UIManager } from './modules/UIManager.js';
+
+/**
+ * Classe principale de l'application MakeMyWay
+ * Orchestre tous les modules et gère le cycle de vie de l'application
+ */
+class MakeMyWayApp {
+    constructor() {
+        this.version = '2.0.0';
+        this.modules = {};
+        this.isInitialized = false;
+        this.initializationPromise = null;
+    }
+
+    /**
+     * Initialise l'application complète
+     * @returns {Promise<void>}
+     */
+    async init() {
+        if (this.initializationPromise) {
+            return this.initializationPromise;
+        }
+
+        this.initializationPromise = this._performInitialization();
+        return this.initializationPromise;
+    }
+
+    /**
+     * Effectue l'initialisation complète
+     * @private
+     */
+    async _performInitialization() {
+        console.log(`🚀 Initialisation de MakeMyWay v${this.version}...`);
+        
+        try {
+            // Vérification des prérequis
+            this._checkPrerequisites();
+            
+            // 1. Initialiser les services de base
+            await this._initializeServices();
+            
+            // 2. Initialiser la carte
+            await this._initializeMap();
+            
+            // 3. Initialiser le générateur de parcours
+            this._initializeRouteGenerator();
+            
+            // 4. Initialiser l'interface utilisateur
+            await this._initializeUI();
+            
+            // 5. Connecter les modules
+            this._connectModules();
+            
+            // 6. Configuration finale
+            this._finalizeSetup();
+            
+            this.isInitialized = true;
+            console.log(`✅ MakeMyWay v${this.version} initialisé avec succès`);
+            
+            // Rendre l'app accessible globalement pour compatibilité
+            window.makeMyWayApp = this;
+            
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'initialisation:', error);
+            this._handleInitializationError(error);
+            throw error;
+        }
+    }
+
+    /**
+     * Vérifie que tous les prérequis sont disponibles
+     * @private
+     */
+    _checkPrerequisites() {
+        console.log('🔍 Vérification des prérequis...');
+        
+        // Vérifier Leaflet
+        if (typeof L === 'undefined') {
+            throw new Error('Leaflet n\'est pas chargé. Vérifiez que la bibliothèque est incluse.');
+        }
+        
+        // Vérifier le conteneur de carte
+        const mapContainer = document.getElementById('map');
+        if (!mapContainer) {
+            throw new Error('Conteneur de carte (#map) non trouvé dans le DOM.');
+        }
+        
+        // Vérifier les APIs
+        if (!window.fetch) {
+            throw new Error('L\'API Fetch n\'est pas supportée par ce navigateur.');
+        }
+        
+        console.log('✅ Prérequis vérifiés');
+    }
+
+    /**
+     * Initialise les services API
+     * @private
+     */
+    async _initializeServices() {
+        console.log('🔧 Initialisation des services...');
+        
+        // Service API
+        this.modules.apiService = new ApiService();
+        console.log('✅ ApiService initialisé');
+        
+        // Test de connectivité API (optionnel)
+        try {
+            const testAddresses = await this.modules.apiService.searchAddresses('Paris', 1);
+            if (testAddresses.length > 0) {
+                console.log('✅ Connectivité API vérifiée');
+            }
+        } catch (error) {
+            console.warn('⚠️ Test de connectivité API échoué:', error.message);
+            // Ne pas bloquer l'initialisation pour autant
+        }
+    }
+
+    /**
+     * Initialise le gestionnaire de carte
+     * @private
+     */
+    async _initializeMap() {
+        console.log('🗺️ Initialisation de la carte...');
+        
+        this.modules.mapManager = new MapManager(this.modules.apiService);
+        await this.modules.mapManager.initialize('map');
+        
+        console.log('✅ MapManager initialisé');
+    }
+
+    /**
+     * Initialise le générateur de parcours
+     * @private
+     */
+    _initializeRouteGenerator() {
+        console.log('🛣️ Initialisation du générateur de parcours...');
+        
+        this.modules.routeGenerator = new RouteGenerator(this.modules.apiService);
+        
+        console.log('✅ RouteGenerator initialisé');
+    }
+
+    /**
+     * Initialise l'interface utilisateur
+     * @private
+     */
+    async _initializeUI() {
+        console.log('🎨 Initialisation de l\'interface...');
+        
+        this.modules.uiManager = new UIManager(
+            this.modules.apiService,
+            this.modules.mapManager,
+            this.modules.routeGenerator
+        );
+        
+        await this.modules.uiManager.initialize();
+        
+        console.log('✅ UIManager initialisé');
+    }
+
+    /**
+     * Connecte les modules entre eux
+     * @private
+     */
+    _connectModules() {
+        console.log('🔗 Connexion des modules...');
+        
+        // Connecter l'UI Manager avec le Map Manager pour les callbacks
+        this.modules.uiManager.setupMapCallbacks();
+        
+        console.log('✅ Modules connectés');
+    }
+
+    /**
+     * Configuration finale de l'application
+     * @private
+     */
+    _finalizeSetup() {
+        console.log('⚙️ Configuration finale...');
+        
+        // Gestion des erreurs globales
+        window.addEventListener('error', (event) => {
+            console.error('Erreur globale:', event.error);
+            this._handleGlobalError(event.error);
+        });
+        
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Promise non gérée:', event.reason);
+            this._handleGlobalError(event.reason);
+        });
+        
+        // Gestion du redimensionnement
+        window.addEventListener('resize', () => {
+            if (this.modules.mapManager) {
+                this.modules.mapManager.invalidateSize();
+            }
+        });
+        
+        // Logging de performance
+        if (typeof performance !== 'undefined' && performance.mark) {
+            performance.mark('makeMyWayApp-initialized');
+            console.log('🏁 Performance mark: makeMyWayApp-initialized');
+        }
+        
+        console.log('✅ Configuration finale terminée');
+    }
+
+    /**
+     * Gère les erreurs d'initialisation
+     * @param {Error} error - Erreur survenue
+     * @private
+     */
+    _handleInitializationError(error) {
+        console.error('💥 Erreur d\'initialisation:', error);
+        
+        // Afficher une erreur à l'utilisateur
+        const errorMessage = `
+            Erreur d'initialisation de MakeMyWay:<br>
+            ${error.message}<br><br>
+            Veuillez recharger la page ou contacter le support.
+        `;
+        
+        // Créer et afficher un message d'erreur
+        this._showCriticalError(errorMessage);
+        
+        // Analytics/logging si disponible
+        this._logError('initialization', error);
+    }
+
+    /**
+     * Gère les erreurs globales
+     * @param {Error} error - Erreur survenue
+     * @private
+     */
+    _handleGlobalError(error) {
+        console.error('💥 Erreur globale:', error);
+        
+        // Log pour debugging
+        this._logError('global', error);
+        
+        // Ne pas afficher d'erreur critique pour toutes les erreurs
+        // Laisser l'application continuer si possible
+    }
+
+    /**
+     * Affiche une erreur critique à l'utilisateur
+     * @param {string} message - Message d'erreur
+     * @private
+     */
+    _showCriticalError(message) {
+        // Créer un overlay d'erreur simple
+        const errorOverlay = document.createElement('div');
+        errorOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem;
+        `;
+        
+        const errorContent = document.createElement('div');
+        errorContent.style.cssText = `
+            background: #1f2937;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        `;
+        
+        errorContent.innerHTML = `
+            <h2 style="color: #ef4444; margin-bottom: 1rem;">❌ Erreur d'Application</h2>
+            <p style="line-height: 1.6; margin-bottom: 2rem;">${message}</p>
+            <button onclick="window.location.reload()" style="
+                background: #6366f1;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 0.5rem;
+                font-size: 1rem;
+                cursor: pointer;
+                transition: background 0.2s ease;
+            " onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+                Recharger la page
+            </button>
+        `;
+        
+        errorOverlay.appendChild(errorContent);
+        document.body.appendChild(errorOverlay);
+    }
+
+    /**
+     * Log une erreur (peut être étendu pour analytics)
+     * @param {string} type - Type d'erreur
+     * @param {Error} error - Erreur
+     * @private
+     */
+    _logError(type, error) {
+        const errorInfo = {
+            type,
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
+        
+        // Log local
+        console.error('Error Log:', errorInfo);
+        
+        // Ici on pourrait envoyer les erreurs à un service d'analytics
+        // Exemple: sendErrorToAnalytics(errorInfo);
+    }
+
+    /**
+     * API publique pour les fonctionnalités courantes
+     */
+
+    /**
+     * Génère un nouveau parcours
+     * @param {Object} options - Options de génération
+     * @returns {Promise<Object>} Données du parcours généré
+     */
+    async generateRoute(options = {}) {
+        if (!this.isInitialized) {
+            throw new Error('Application non initialisée');
+        }
+        
+        return this.modules.uiManager.generateRoute(options);
+    }
+
+    /**
+     * Remet l'application à zéro
+     */
+    reset() {
+        if (!this.isInitialized) return;
+        
+        this.modules.uiManager.resetAll();
+    }
+
+    /**
+     * Exporte le parcours actuel en GPX
+     */
+    exportGPX() {
+        if (!this.isInitialized) return;
+        
+        this.modules.uiManager.exportGPX();
+    }
+
+    /**
+     * Définit un point de départ
+     * @param {Object} latlng - Position {lat, lng}
+     */
+    setStartPoint(latlng) {
+        if (!this.isInitialized) return;
+        
+        this.modules.uiManager.setStartPoint(latlng);
+    }
+
+    /**
+     * Définit un point d'arrivée
+     * @param {Object} latlng - Position {lat, lng}
+     */
+    setEndPoint(latlng) {
+        if (!this.isInitialized) return;
+        
+        this.modules.uiManager.setEndPoint(latlng);
+    }
+
+    /**
+     * Obtient l'état actuel de l'application
+     * @returns {Object} État de l'application
+     */
+    getState() {
+        if (!this.isInitialized) {
+            return { initialized: false };
+        }
+        
+        return {
+            initialized: true,
+            version: this.version,
+            ui: this.modules.uiManager.getState(),
+            map: this.modules.mapManager.getMarkerPositions(),
+            lastRoute: this.modules.routeGenerator.getLastRouteMetadata(),
+            apiCache: this.modules.apiService.getCacheStats()
+        };
+    }
+
+    /**
+     * Méthodes pour compatibilité avec l'ancienne API
+     * (pour faciliter la transition)
+     */
+
+    // Getters pour accès direct aux modules (déprécié, à éviter)
+    get map() {
+        return this.modules.mapManager?.map;
+    }
+
+    get routePolyline() {
+        return this.modules.mapManager?.routePolyline;
+    }
+
+    get startPoint() {
+        return this.modules.uiManager?.getState().startPoint;
+    }
+
+    get endPoint() {
+        return this.modules.uiManager?.getState().endPoint;
+    }
+
+    // Méthodes de compatibilité
+    showResults(route, targetDistance, mode) {
+        console.warn('showResults() est déprécié. Les résultats sont affichés automatiquement.');
+    }
+
+    showLoading() {
+        if (this.modules.uiManager) {
+            this.modules.uiManager.showLoading();
+        }
+    }
+
+    hideLoading() {
+        if (this.modules.uiManager) {
+            this.modules.uiManager.hideLoading();
+        }
+    }
+
+    resetRoute() {
+        this.reset();
+    }
+}
+
+/**
+ * Fonction d'initialisation globale
+ */
+async function initializeMakeMyWay() {
+    try {
+        console.log('📦 Démarrage de MakeMyWay...');
+        
+        // Créer l'instance de l'application
+        const app = new MakeMyWayApp();
+        
+        // Initialiser l'application
+        await app.init();
+        
+        // Rendre l'app accessible globalement pour compatibilité
+        window.runMyWayApp = app; // Compatibilité avec l'ancienne version
+        window.makeMyWayApp = app; // Nouvelle référence
+        
+        console.log('🎉 MakeMyWay est prêt à l\'usage !');
+        
+        return app;
+        
+    } catch (error) {
+        console.error('❌ Échec de l\'initialisation de MakeMyWay:', error);
+        throw error;
+    }
+}
+
+/**
+ * Démarrage automatique quand le DOM est prêt
+ */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeMakeMyWay);
+} else {
+    // Le DOM est déjà chargé
+    initializeMakeMyWay().catch(error => {
+        console.error('Erreur de démarrage:', error);
+    });
+}
+
+// Export pour utilisation en tant que module
+export { MakeMyWayApp, initializeMakeMyWay };
+
+// Log de chargement du script
+console.log('📦 Module principal MakeMyWay chargé');
