@@ -493,7 +493,7 @@ export { MakeMyWayApp, initializeMakeMyWay };
 // Enregistrement du Service Worker pour la PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/Runway-1/service-worker.js')
+    navigator.serviceWorker.register('/MakeMyWay/service-worker.js')
       .then(registration => {
         console.log('PWA: ServiceWorker enregistré avec succès. Scope:', registration.scope);
       })
