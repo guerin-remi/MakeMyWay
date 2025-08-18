@@ -6,8 +6,7 @@
     {
       "src": "/MakeMyWay/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/svg+xml"
     },
     {
       "src": "/MakeMyWay/favicon-192.png",
