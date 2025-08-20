@@ -18,6 +18,11 @@ export class AuthService {
      * @returns {string} URL de base de l'API
      */
     getApiBaseUrl() {
+        // TEMPORAIRE: Toujours utiliser Render pour les tests
+        // TODO: Améliorer la détection d'environnement
+        return 'https://makemyway-backend.onrender.com/api/auth';
+        
+        /* Ancienne logique de détection (à réactiver plus tard)
         // Si on est sur GitHub Pages ou un domaine de production
         if (window.location.hostname.includes('github.io') || 
             window.location.hostname.includes('makemyway') ||
@@ -25,8 +30,9 @@ export class AuthService {
             return 'https://makemyway-backend.onrender.com/api/auth';
         }
         
-        // Sinon on est en développement local
+        // Sinon on est en développement local avec backend local
         return 'http://localhost:3001/api/auth';
+        */
     }
 
     /**
