@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug API MakeMyWay</title>
+    <style>
+        body { font-family: Arial; margin: 2rem; }
+        .result { margin: 1rem 0; padding: 1rem; border-radius: 4px; }
+        .success { background: #d1fae5; }
+        .error { background: #fee2e2; }
+        pre { background: #f3f4f6; padding: 1rem; border-radius: 4px; overflow: auto; }
+        button { padding: 0.5rem 1rem; margin: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Debug API MakeMyWay</h1>
+    
+    <button onclick="testHealth()">Test Health</button>
+    <button onclick="testCORS()">Test CORS</button>
+    <button onclick="testRegister()">Test Register</button>
+    <button onclick="showCurrentURL()">Show Current URL</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        const API_BASE = 'https://makemyway-backend.onrender.com';
+        const output = document.getElementById('output');
+        
+        function log(title, data, isError = false) {
+            const div = document.createElement('div');
+            div.className = `result ${isError ? 'error' : 'success'}`;
+            div.innerHTML = `<h3>${title}</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            output.appendChild(div);
+        }
+        
+        function showCurrentURL() {
+            log('Current URL Info', {
+                hostname: window.location.hostname,
+                protocol: window.location.protocol,
+                href: window.location.href,
+                isLocal: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+                isGitHub: window.location.hostname.includes('github.io'),
+                detectedAPI: getAPIBase()
+            });
+        }
+        
+        function getAPIBase() {
+            if (window.location.hostname.includes('github.io') || 
+                window.location.hostname.includes('makemyway') ||
+                window.location.protocol === 'https:') {
+                return 'https://makemyway-backend.onrender.com/api/auth';
+            }
+            return 'http://localhost:3001/api/auth';
+        }
+        
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const data = await response.json();
+                log('Health Test', { status: response.status, data });
+            } catch (error) {
+                log('Health Test ERROR', { error: error.message }, true);
+            }
+        }
+        
+        async function testCORS() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                log('CORS Test', { 
+                    status: response.status, 
+                    headers: [...response.headers.entries()],
+                    data 
+                });
+            } catch (error) {
+                log('CORS Test ERROR', { error: error.message, stack: error.stack }, true);
+            }
+        }
+        
+        async function testRegister() {
+            const testData = {
+                name: 'Test User Debug',
+                email: `test${Date.now()}@example.com`,
+                password: 'password123'
+            };
+            
+            try {
+                log('Register Request', { url: `${API_BASE}/api/auth/register`, body: testData });
+                
+                const response = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { raw: responseText };
+                }
+                
+                log('Register Response', { 
+                    status: response.status, 
+                    statusText: response.statusText,
+                    headers: [...response.headers.entries()],
+                    data: responseData 
+                }, !response.ok);
+                
+            } catch (error) {
+                log('Register ERROR', { 
+                    error: error.message, 
+                    stack: error.stack,
+                    name: error.name
+                }, true);
+            }
+        }
+        
+        // Auto-run some tests
+        showCurrentURL();
+    </script>
+</body>
+</html>
