@@ -153,15 +153,118 @@ export class UIManager {
     }
 
     /**
-     * Configure la saisie automatique pour les adresses et POI
+     * Configure la saisie automatique pour les adresses avec Google Places Autocomplete
      */
     setupAutocomplete() {
-        // Autocomplétion des adresses
-        this.setupAddressAutocomplete('startAddress', 'startAddressSuggestions', 'start');
-        this.setupAddressAutocomplete('endAddress', 'endAddressSuggestions', 'end');
-        
-        // Autocomplétion des POI
-        this.setupPOIAutocomplete('customPoi', 'poiSuggestions');
+        // Vérifier que Google Maps est disponible
+        if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+            console.warn('⚠️ Google Places API non disponible, autocomplétion désactivée');
+            return;
+        }
+
+        try {
+            // Configuration pour les autocompletes (privilégier les adresses)
+            const autocompleteOptions = {
+                types: ['address'],
+                componentRestrictions: { country: 'fr' }, // Limiter à la France (optionnel)
+                fields: ['place_id', 'geometry', 'name', 'formatted_address']
+            };
+
+            // Configurer l'autocomplétion pour le point de départ
+            this.setupStartAddressAutocomplete(autocompleteOptions);
+
+            // Configurer l'autocomplétion pour le point d'arrivée  
+            this.setupEndAddressAutocomplete(autocompleteOptions);
+
+            console.log('✅ Autocomplétion Google Places configurée');
+
+        } catch (error) {
+            console.error('Erreur configuration Google Places Autocomplete:', error);
+        }
+    }
+
+    /**
+     * Configure l'autocomplétion Google Places pour le point de départ
+     * @param {Object} options - Options de configuration
+     */
+    setupStartAddressAutocomplete(options) {
+        const input = this.elements.startAddress;
+        if (!input) {
+            console.warn('⚠️ Champ startAddress non trouvé');
+            return;
+        }
+
+        // Créer l'instance d'autocomplétion
+        const autocomplete = new google.maps.places.Autocomplete(input, options);
+
+        // Écouter l'événement place_changed
+        autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+
+            // Vérifier que le lieu a une géométrie (coordonnées)
+            if (!place.geometry || !place.geometry.location) {
+                console.warn('⚠️ Lieu sélectionné sans coordonnées:', place.name);
+                return;
+            }
+
+            // Extraire les coordonnées
+            const location = place.geometry.location;
+            const coordinates = {
+                lat: location.lat(),
+                lng: location.lng()
+            };
+
+            // Mettre à jour le point de départ
+            this.setStartPoint(coordinates);
+
+            console.log('📍 Point de départ défini via Google Places:', place.formatted_address);
+        });
+
+        // Stocker la référence pour un éventuel nettoyage
+        this.autocompletes = this.autocompletes || {};
+        this.autocompletes.start = autocomplete;
+    }
+
+    /**
+     * Configure l'autocomplétion Google Places pour le point d'arrivée
+     * @param {Object} options - Options de configuration
+     */
+    setupEndAddressAutocomplete(options) {
+        const input = this.elements.endAddress;
+        if (!input) {
+            console.warn('⚠️ Champ endAddress non trouvé');
+            return;
+        }
+
+        // Créer l'instance d'autocomplétion
+        const autocomplete = new google.maps.places.Autocomplete(input, options);
+
+        // Écouter l'événement place_changed
+        autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+
+            // Vérifier que le lieu a une géométrie (coordonnées)
+            if (!place.geometry || !place.geometry.location) {
+                console.warn('⚠️ Lieu sélectionné sans coordonnées:', place.name);
+                return;
+            }
+
+            // Extraire les coordonnées
+            const location = place.geometry.location;
+            const coordinates = {
+                lat: location.lat(),
+                lng: location.lng()
+            };
+
+            // Mettre à jour le point d'arrivée
+            this.setEndPoint(coordinates);
+
+            console.log('🏁 Point d\'arrivée défini via Google Places:', place.formatted_address);
+        });
+
+        // Stocker la référence pour un éventuel nettoyage
+        this.autocompletes = this.autocompletes || {};
+        this.autocompletes.end = autocomplete;
     }
 
     /**
@@ -706,30 +809,17 @@ export class UIManager {
             this.showLoading(CONFIG.MESSAGES.INFO.SEARCHING);
             
             const searchCenter = this.state.startPoint || this.mapManager.getMapCenter();
-            const pois = await this.apiService.searchPOIs(query, searchCenter);
+            
+            // Recherche avec Google Places
+            const pois = await this.apiService.searchCustomPOI(query, searchCenter, 5);
             
             if (pois.length > 0) {
                 const poi = pois[0];
                 this.addPOIToList(poi);
                 input.value = '';
+                console.log(`✅ POI personnalisé ajouté: ${poi.name}`);
             } else {
-                // Essayer avec recherche d'adresse
-                const addresses = await this.apiService.searchAddresses(query);
-                if (addresses.length > 0) {
-                    const address = addresses[0];
-                    const genericPOI = {
-                        name: this.apiService.formatAddressName(address.display_name),
-                        full_name: address.display_name,
-                        lat: address.lat,
-                        lng: address.lng,
-                        type: 'custom',
-                        class: 'custom'
-                    };
-                    this.addPOIToList(genericPOI);
-                    input.value = '';
-                } else {
-                    this.showError('Aucun lieu trouvé pour cette recherche');
-                }
+                this.showError('Aucun lieu trouvé pour cette recherche');
             }
             
         } catch (error) {

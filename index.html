@@ -19,8 +19,7 @@
     <!-- Police Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- Google Maps API sera chargée via script dynamique -->
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous">
@@ -321,9 +320,59 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Application modulaire -->
-    <script type="module" src="assets/js/main.js" defer></script>
+    <!-- Fonction pont globale pour Google Maps -->
+    <script>
+        /**
+         * Fonction globale appelée par le callback Google Maps
+         * Elle importe le module et lance l'initialisation
+         */
+        async function initMap() {
+            try {
+                console.log('🔗 Callback Google Maps appelé, importation du module...');
+                
+                // Importer le module principal
+                const { initializeMakeMyWay } = await import('./assets/js/main.js');
+                
+                // Lancer l'initialisation
+                await initializeMakeMyWay();
+                
+                console.log('✅ Application initialisée via callback Google Maps');
+                
+            } catch (error) {
+                console.error('❌ Erreur lors de l\'initialisation via callback Google Maps:', error);
+                
+                // Afficher une erreur utilisateur
+                const errorMessage = document.createElement('div');
+                errorMessage.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #fee2e2;
+                    border: 1px solid #fecaca;
+                    color: #991b1b;
+                    padding: 1rem;
+                    border-radius: 0.5rem;
+                    z-index: 10000;
+                    max-width: 500px;
+                    text-align: center;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                `;
+                errorMessage.innerHTML = `
+                    <strong>⚠️ Erreur d'initialisation</strong><br>
+                    <small>${error.message}</small><br>
+                    <button onclick="window.location.reload()" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; background: #dc2626; color: white; border: none; border-radius: 0.25rem; cursor: pointer;">Recharger</button>
+                `;
+                document.body.appendChild(errorMessage);
+            }
+        }
+    </script>
+    
+    <!-- Google Maps API avec les librairies places et geometry -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBcwdJoblZLraZRdEndCxe35RhtlQaY8gQ&libraries=places,geometry&callback=initMap"></script>
+    
+    <!-- Application modulaire (chargée par le callback Google Maps) -->
+    <!-- <script type="module" src="assets/js/main.js" defer></script> -->
     
     <!-- Conteneurs de suggestions pour l'autocomplétion -->
     <div id="startAddressSuggestions" class="suggestion-container"></div>

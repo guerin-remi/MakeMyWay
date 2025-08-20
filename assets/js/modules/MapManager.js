@@ -18,10 +18,64 @@ export class MapManager {
     }
 
     /**
-     * Initialise la carte Leaflet
+     * Initialise la carte Google Maps
      * @param {string} containerId - ID du conteneur de carte
      * @returns {Promise<void>}
      */
+    async initialize(containerId = 'map') {
+        // Vérifier que Google Maps est chargé
+        if (typeof google === 'undefined' || !google.maps) {
+            throw new Error('Google Maps API n\'est pas chargée');
+        }
+
+        const mapContainer = document.getElementById(containerId);
+        if (!mapContainer) {
+            throw new Error(`Conteneur de carte non trouvé: ${containerId}`);
+        }
+
+        try {
+            // Créer la carte Google Maps
+            this.map = new google.maps.Map(mapContainer, {
+                center: { 
+                    lat: CONFIG.MAP.DEFAULT_CENTER[0], 
+                    lng: CONFIG.MAP.DEFAULT_CENTER[1] 
+                },
+                zoom: CONFIG.MAP.DEFAULT_ZOOM,
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                // Options de style et contrôles
+                zoomControl: false, // On utilisera nos propres contrôles
+                mapTypeControl: false,
+                scaleControl: true,
+                streetViewControl: false,
+                rotateControl: false,
+                fullscreenControl: false,
+                // Style moderne
+                styles: [
+                    {
+                        featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{ visibility: "off" }]
+                    }
+                ]
+            });
+
+            // Configurer les événements
+            this.setupMapEvents();
+            
+            console.log('🗺️ Carte Google Maps initialisée');
+
+            // Initialiser le Places Service dans ApiService si disponible
+            if (this.apiService && this.apiService.initializePlacesService) {
+                this.apiService.initializePlacesService(this.map);
+            }
+
+        } catch (error) {
+            console.error('Erreur initialisation carte Google Maps:', error);
+            throw error;
+        }
+    }
+
+    /* ===== ANCIEN CODE LEAFLET (COMMENTÉ) =====
     async initialize(containerId = 'map') {
         if (typeof L === 'undefined') {
             throw new Error('Leaflet n\'est pas chargé');
@@ -58,10 +112,33 @@ export class MapManager {
             throw error;
         }
     }
+    ===== FIN ANCIEN CODE LEAFLET ===== */
 
     /**
-     * Configure les événements de la carte
+     * Configure les événements de la carte Google Maps
      */
+    setupMapEvents() {
+        // Clic sur la carte
+        this.map.addListener('click', (e) => {
+            if (this.onMapClick) {
+                // Convertir au format attendu par l'application
+                const latlng = {
+                    lat: e.latLng.lat(),
+                    lng: e.latLng.lng()
+                };
+                this.onMapClick(latlng);
+            }
+        });
+
+        // Événements de redimensionnement (pas nécessaire avec Google Maps, il s'adapte automatiquement)
+        // Mais on garde pour compatibilité
+        google.maps.event.addListener(this.map, 'resize', () => {
+            // Google Maps gère le redimensionnement automatiquement
+            console.log('🔄 Redimensionnement de la carte détecté');
+        });
+    }
+
+    /* ===== ANCIEN CODE LEAFLET (COMMENTÉ) =====
     setupMapEvents() {
         // Clic sur la carte
         this.map.on('click', (e) => {
@@ -75,6 +152,7 @@ export class MapManager {
             this.map.invalidateSize();
         });
     }
+    ===== FIN ANCIEN CODE LEAFLET ===== */
 
     /**
      * Définit le callback pour les clics sur la carte
@@ -100,36 +178,45 @@ export class MapManager {
         // Supprimer l'ancien marqueur
         this.removeStartMarker();
 
-        // Créer le nouveau marqueur
-        this.markers.start = L.marker(latlng, {
-            icon: L.divIcon({
-                html: '<div class="custom-marker-start"><i class="fas fa-play"></i></div>',
-                className: 'custom-marker-container',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            }),
-            draggable: true
-        }).addTo(this.map);
+        // Créer le nouveau marqueur Google Maps
+        this.markers.start = new google.maps.Marker({
+            position: { lat: latlng.lat, lng: latlng.lng },
+            map: this.map,
+            draggable: true,
+            title: 'Point de départ - Glissez pour déplacer, clic droit pour supprimer',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: '#10B981', // Vert succès
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: 'white'
+            }
+        });
 
         // Configurer les événements du marqueur
         this.setupStartMarkerEvents();
 
-        console.log('📍 Marqueur de départ placé:', latlng);
+        console.log('📍 Marqueur de départ Google Maps placé:', latlng);
     }
 
     /**
-     * Configure les événements du marqueur de départ
+     * Configure les événements du marqueur de départ Google Maps
      */
     setupStartMarkerEvents() {
         if (!this.markers.start) return;
 
-        // Événements de drag & drop
-        this.markers.start.on('dragstart', () => {
+        // Événement de début de glissement
+        this.markers.start.addListener('dragstart', () => {
             console.log('🤏 Déplacement du point de départ...');
         });
 
-        this.markers.start.on('dragend', (e) => {
-            const newPos = e.target.getLatLng();
+        // Événement de fin de glissement
+        this.markers.start.addListener('dragend', (e) => {
+            const newPos = {
+                lat: e.latLng.lat(),
+                lng: e.latLng.lng()
+            };
             if (this.onMarkerMove) {
                 this.onMarkerMove('start', newPos);
             }
@@ -137,23 +224,29 @@ export class MapManager {
         });
 
         // Clic droit pour supprimer
-        this.markers.start.on('contextmenu', (e) => {
-            e.originalEvent.preventDefault();
+        this.markers.start.addListener('rightclick', (e) => {
             this.removeStartMarker();
             if (this.onMarkerMove) {
                 this.onMarkerMove('start', null);
             }
         });
 
-        // Popup d'aide
-        this.markers.start.bindPopup(`
-            <div class="marker-popup">
-                <strong><i class="fas fa-play"></i> Point de départ</strong>
-                <div class="popup-tips">
-                    <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+        // InfoWindow d'aide (équivalent du popup Leaflet)
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div class="marker-popup">
+                    <strong><i class="fas fa-play"></i> Point de départ</strong>
+                    <div class="popup-tips">
+                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+                    </div>
                 </div>
-            </div>
-        `);
+            `
+        });
+
+        // Afficher l'info au clic
+        this.markers.start.addListener('click', () => {
+            infoWindow.open(this.map, this.markers.start);
+        });
     }
 
     /**
@@ -164,36 +257,45 @@ export class MapManager {
         // Supprimer l'ancien marqueur
         this.removeEndMarker();
 
-        // Créer le nouveau marqueur
-        this.markers.end = L.marker(latlng, {
-            icon: L.divIcon({
-                html: '<div class="custom-marker-end"><i class="fas fa-flag-checkered"></i></div>',
-                className: 'custom-marker-container',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            }),
-            draggable: true
-        }).addTo(this.map);
+        // Créer le nouveau marqueur Google Maps
+        this.markers.end = new google.maps.Marker({
+            position: { lat: latlng.lat, lng: latlng.lng },
+            map: this.map,
+            draggable: true,
+            title: 'Point d\'arrivée - Glissez pour déplacer, clic droit pour supprimer',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: '#EF4444', // Rouge erreur
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: 'white'
+            }
+        });
 
         // Configurer les événements du marqueur
         this.setupEndMarkerEvents();
 
-        console.log('🏁 Marqueur d\'arrivée placé:', latlng);
+        console.log('🏁 Marqueur d\'arrivée Google Maps placé:', latlng);
     }
 
     /**
-     * Configure les événements du marqueur d'arrivée
+     * Configure les événements du marqueur d'arrivée Google Maps
      */
     setupEndMarkerEvents() {
         if (!this.markers.end) return;
 
-        // Événements de drag & drop
-        this.markers.end.on('dragstart', () => {
+        // Événement de début de glissement
+        this.markers.end.addListener('dragstart', () => {
             console.log('🤏 Déplacement du point d\'arrivée...');
         });
 
-        this.markers.end.on('dragend', (e) => {
-            const newPos = e.target.getLatLng();
+        // Événement de fin de glissement
+        this.markers.end.addListener('dragend', (e) => {
+            const newPos = {
+                lat: e.latLng.lat(),
+                lng: e.latLng.lng()
+            };
             if (this.onMarkerMove) {
                 this.onMarkerMove('end', newPos);
             }
@@ -201,23 +303,29 @@ export class MapManager {
         });
 
         // Clic droit pour supprimer
-        this.markers.end.on('contextmenu', (e) => {
-            e.originalEvent.preventDefault();
+        this.markers.end.addListener('rightclick', (e) => {
             this.removeEndMarker();
             if (this.onMarkerMove) {
                 this.onMarkerMove('end', null);
             }
         });
 
-        // Popup d'aide
-        this.markers.end.bindPopup(`
-            <div class="marker-popup">
-                <strong><i class="fas fa-flag-checkered"></i> Point d'arrivée</strong>
-                <div class="popup-tips">
-                    <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+        // InfoWindow d'aide (équivalent du popup Leaflet)
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div class="marker-popup">
+                    <strong><i class="fas fa-flag-checkered"></i> Point d'arrivée</strong>
+                    <div class="popup-tips">
+                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+                    </div>
                 </div>
-            </div>
-        `);
+            `
+        });
+
+        // Afficher l'info au clic
+        this.markers.end.addListener('click', () => {
+            infoWindow.open(this.map, this.markers.end);
+        });
     }
 
     /**
@@ -226,25 +334,37 @@ export class MapManager {
      * @returns {Object} Référence du marqueur ajouté
      */
     addPOIMarker(poi) {
-        const marker = L.circleMarker([poi.lat, poi.lng], {
-            radius: 8,
-            fillColor: '#F59E0B',
-            color: 'white',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.8
-        }).addTo(this.map);
+        const marker = new google.maps.Marker({
+            position: { lat: poi.lat, lng: poi.lng },
+            map: this.map,
+            title: poi.name,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: '#F59E0B', // Couleur ambre pour les POI
+                fillOpacity: 0.8,
+                strokeWeight: 2,
+                strokeColor: 'white'
+            }
+        });
 
-        // Popup avec informations du POI
+        // InfoWindow avec informations du POI
         const icon = this.apiService.getPOITypeIcon(poi.type);
         const typeLabel = this.apiService.formatPOIType(poi.type, poi.class);
         
-        marker.bindPopup(`
-            <div class="poi-popup">
-                <strong>${icon} ${poi.name}</strong><br>
-                <small>${typeLabel}</small>
-            </div>
-        `);
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div class="poi-popup">
+                    <strong>${icon} ${poi.name}</strong><br>
+                    <small>${typeLabel}</small>
+                </div>
+            `
+        });
+
+        // Afficher l'info au clic
+        marker.addListener('click', () => {
+            infoWindow.open(this.map, marker);
+        });
 
         // Stocker la référence du marqueur avec le POI
         this.markers.pois.push(marker);
@@ -257,8 +377,8 @@ export class MapManager {
      * @param {Object} marker - Référence du marqueur à supprimer
      */
     removePOIMarker(marker) {
-        if (marker && this.map.hasLayer(marker)) {
-            this.map.removeLayer(marker);
+        if (marker) {
+            marker.setMap(null);
             
             // Retirer de la liste des marqueurs POI
             const index = this.markers.pois.indexOf(marker);
@@ -273,16 +393,14 @@ export class MapManager {
      */
     removeAllPOIMarkers() {
         this.markers.pois.forEach(marker => {
-            if (this.map.hasLayer(marker)) {
-                this.map.removeLayer(marker);
-            }
+            marker.setMap(null);
         });
         this.markers.pois = [];
         console.log('🗑️ Tous les marqueurs POI supprimés');
     }
 
     /**
-     * Affiche un itinéraire sur la carte
+     * Affiche un itinéraire sur la carte avec Google Maps Polyline
      * @param {Array} routePoints - Points de l'itinéraire [{lat, lng}, ...]
      * @param {string} mode - Mode de transport pour la couleur
      * @param {Object} options - Options d'affichage
@@ -305,33 +423,52 @@ export class MapManager {
 
         const routeColor = colors[mode] || colors.walking;
 
-        // Créer la polyline
-        this.routePolyline = L.polyline(routePoints, {
-            color: routeColor,
-            weight: options.weight || 4,
-            opacity: options.opacity || 0.8,
-            smoothFactor: options.smoothFactor || 1
-        }).addTo(this.map);
+        // Convertir les points au format Google Maps LatLng
+        const path = routePoints.map(point => ({
+            lat: point.lat,
+            lng: point.lng
+        }));
+
+        // Créer la polyline Google Maps
+        this.routePolyline = new google.maps.Polyline({
+            path: path,
+            geodesic: true,
+            strokeColor: routeColor,
+            strokeOpacity: options.opacity || 0.8,
+            strokeWeight: options.weight || 4
+        });
+
+        // Ajouter la polyline à la carte
+        this.routePolyline.setMap(this.map);
 
         // Ajouter des marqueurs aux points clés si demandé
-        if (options.showWaypoints) {
+        if (options.showWaypoints && routePoints.length > 4) {
             const midPoint = Math.floor(routePoints.length / 2);
             if (routePoints[midPoint]) {
-                L.circleMarker(routePoints[midPoint], {
-                    radius: 6,
-                    fillColor: routeColor,
-                    color: 'white',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                }).addTo(this.map).bindPopup('Point intermédiaire');
+                const waypointMarker = new google.maps.Marker({
+                    position: { lat: routePoints[midPoint].lat, lng: routePoints[midPoint].lng },
+                    map: this.map,
+                    title: 'Point intermédiaire',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 4,
+                        fillColor: routeColor,
+                        fillOpacity: 0.8,
+                        strokeWeight: 2,
+                        strokeColor: 'white'
+                    }
+                });
+
+                // Stocker le marqueur pour le nettoyer plus tard
+                this.waypointMarkers = this.waypointMarkers || [];
+                this.waypointMarkers.push(waypointMarker);
             }
         }
 
         // Ajuster la vue pour voir tout l'itinéraire
         this.fitRouteInView(options.padding);
 
-        console.log(`🛣️ Itinéraire affiché: ${routePoints.length} points`);
+        console.log(`🛣️ Itinéraire Google Maps affiché: ${routePoints.length} points`);
     }
 
     /**
@@ -339,9 +476,15 @@ export class MapManager {
      */
     clearRoute() {
         if (this.routePolyline) {
-            this.map.removeLayer(this.routePolyline);
+            this.routePolyline.setMap(null);
             this.routePolyline = null;
             console.log('🗑️ Itinéraire supprimé');
+        }
+
+        // Supprimer les marqueurs de waypoints
+        if (this.waypointMarkers && this.waypointMarkers.length > 0) {
+            this.waypointMarkers.forEach(marker => marker.setMap(null));
+            this.waypointMarkers = [];
         }
     }
 
@@ -350,7 +493,7 @@ export class MapManager {
      */
     removeStartMarker() {
         if (this.markers.start) {
-            this.map.removeLayer(this.markers.start);
+            this.markers.start.setMap(null);
             this.markers.start = null;
             console.log('🗑️ Marqueur de départ supprimé');
         }
@@ -361,7 +504,7 @@ export class MapManager {
      */
     removeEndMarker() {
         if (this.markers.end) {
-            this.map.removeLayer(this.markers.end);
+            this.markers.end.setMap(null);
             this.markers.end = null;
             console.log('🗑️ Marqueur d\'arrivée supprimé');
         }
@@ -389,7 +532,22 @@ export class MapManager {
      */
     fitRouteInView(padding = [20, 20]) {
         if (this.routePolyline) {
-            this.map.fitBounds(this.routePolyline.getBounds(), { padding });
+            // Créer les bounds à partir des points de la polyline
+            const bounds = new google.maps.LatLngBounds();
+            
+            // Ajouter chaque point de la polyline aux bounds
+            const path = this.routePolyline.getPath();
+            for (let i = 0; i < path.getLength(); i++) {
+                bounds.extend(path.getAt(i));
+            }
+            
+            // Ajuster la vue de la carte
+            this.map.fitBounds(bounds, { 
+                top: padding[0], 
+                right: padding[1] || padding[0], 
+                bottom: padding[2] || padding[0], 
+                left: padding[3] || padding[1] || padding[0] 
+            });
         }
     }
 
@@ -495,8 +653,14 @@ export class MapManager {
      */
     getMarkerPositions() {
         return {
-            start: this.markers.start ? this.markers.start.getLatLng() : null,
-            end: this.markers.end ? this.markers.end.getLatLng() : null,
+            start: this.markers.start ? {
+                lat: this.markers.start.getPosition().lat(),
+                lng: this.markers.start.getPosition().lng()
+            } : null,
+            end: this.markers.end ? {
+                lat: this.markers.end.getPosition().lat(),
+                lng: this.markers.end.getPosition().lng()
+            } : null,
             poisCount: this.markers.pois.length
         };
     }
@@ -514,9 +678,57 @@ export class MapManager {
      */
     invalidateSize() {
         if (this.map) {
+            // Google Maps se redimensionne automatiquement
+            // Forcer un redraw si nécessaire
             setTimeout(() => {
-                this.map.invalidateSize();
+                google.maps.event.trigger(this.map, 'resize');
             }, 100);
         }
     }
 }
+
+/* ===== ANCIEN CODE LEAFLET (COMMENTÉ POUR RÉFÉRENCE) =====
+
+// Exemple d'ancien code de marqueur Leaflet:
+setStartMarker(latlng) {
+    this.removeStartMarker();
+    this.markers.start = L.marker(latlng, {
+        icon: L.divIcon({
+            html: '<div class="custom-marker-start"><i class="fas fa-play"></i></div>',
+            className: 'custom-marker-container',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        }),
+        draggable: true
+    }).addTo(this.map);
+    
+    this.markers.start.on('dragend', (e) => {
+        const newPos = e.target.getLatLng();
+        if (this.onMarkerMove) {
+            this.onMarkerMove('start', newPos);
+        }
+    });
+}
+
+// Suppression marqueur Leaflet:
+removeStartMarker() {
+    if (this.markers.start) {
+        this.map.removeLayer(this.markers.start);
+        this.markers.start = null;
+    }
+}
+
+// POI Leaflet:
+addPOIMarker(poi) {
+    const marker = L.circleMarker([poi.lat, poi.lng], {
+        radius: 8,
+        fillColor: '#F59E0B',
+        color: 'white',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+    }).addTo(this.map);
+    return marker;
+}
+
+===== FIN ANCIEN CODE LEAFLET ===== */

@@ -91,8 +91,19 @@ export class RouteGenerator {
                     continue;
                 }
                 
-                // Créer la boucle complète
-                const allPoints = [startPoint, ...waypoints, startPoint];
+                // Ajouter les POI aux waypoints si fournis
+                const { pois = [] } = options;
+                let finalWaypoints = [...waypoints];
+                
+                if (pois.length > 0) {
+                    console.log(`Ajout de ${pois.length} POI à l'itinéraire`);
+                    // Convertir les POI au format {lat, lng}
+                    const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                    finalWaypoints = [...waypoints, ...poiPoints];
+                }
+                
+                // Créer la boucle complète avec POI intégrés
+                const allPoints = [startPoint, ...finalWaypoints, startPoint];
                 
                 // Calculer l'itinéraire
                 const routeData = await this.apiService.calculateRoute(allPoints, mode);
@@ -142,8 +153,19 @@ export class RouteGenerator {
         console.log(`Génération A→B: ${targetDistance}km`);
         
         try {
-            // Calculer d'abord la distance directe
-            const directRoute = await this.apiService.calculateRoute([startPoint, endPoint], mode);
+            // Intégrer les POI dans tous les cas
+            const { pois = [] } = options;
+            let basePoints = [startPoint, endPoint];
+            
+            if (pois.length > 0) {
+                console.log(`Intégration de ${pois.length} POI dans l'itinéraire A→B`);
+                // Convertir les POI au format {lat, lng} et les insérer entre le départ et l'arrivée
+                const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                basePoints = [startPoint, ...poiPoints, endPoint];
+            }
+            
+            // Calculer d'abord la distance avec POI inclus
+            const directRoute = await this.apiService.calculateRoute(basePoints, mode);
             const directDistance = directRoute.distance;
             
             console.log(`Distance directe: ${directDistance.toFixed(1)}km, cible: ${targetDistance}km`);
@@ -157,7 +179,7 @@ export class RouteGenerator {
             // Si la distance directe est trop courte, ajouter des détours
             if (directDistance < targetDistance) {
                 console.log('🔄 Ajout de détours pour atteindre la distance cible');
-                return await this.generateRouteWithDetours(startPoint, endPoint, targetDistance, mode);
+                return await this.generateRouteWithDetours(startPoint, endPoint, targetDistance, mode, options);
             } else {
                 console.log('ℹ️ Distance directe supérieure à la cible, utilisation du trajet direct');
                 return directRoute;
@@ -165,8 +187,14 @@ export class RouteGenerator {
             
         } catch (error) {
             console.error('Erreur parcours A→B:', error);
-            // Fallback vers le parcours direct
-            return await this.apiService.calculateRoute([startPoint, endPoint], mode);
+            // Fallback vers le parcours direct avec POI
+            const { pois = [] } = options;
+            let fallbackPoints = [startPoint, endPoint];
+            if (pois.length > 0) {
+                const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                fallbackPoints = [startPoint, ...poiPoints, endPoint];
+            }
+            return await this.apiService.calculateRoute(fallbackPoints, mode);
         }
     }
 
@@ -224,21 +252,9 @@ export class RouteGenerator {
             candidatePoints.push({ lat, lng });
         }
         
-        // Traitement par batches pour optimiser les performances
-        const batchSize = CONFIG.ROUTE_GENERATION.WAYPOINTS.BATCH_SIZE;
-        
-        for (let i = 0; i < candidatePoints.length; i += batchSize) {
-            const batch = candidatePoints.slice(i, i + batchSize);
-            const snapPromises = batch.map(point => this.apiService.snapToRoad(point, mode));
-            
-            const snapResults = await Promise.all(snapPromises);
-            waypoints.push(...snapResults.filter(point => point !== null));
-            
-            // Délai entre les batches
-            if (i + batchSize < candidatePoints.length) {
-                await this.delay(CONFIG.ROUTE_GENERATION.WAYPOINTS.DELAY_BETWEEN_BATCHES);
-            }
-        }
+        // Utiliser directement les points candidats comme waypoints
+        // Google Maps Directions API s'occupe automatiquement de l'alignement sur les routes
+        waypoints.push(...candidatePoints);
         
         console.log(`✅ ${waypoints.length} points de passage générés`);
         return waypoints;
@@ -252,7 +268,7 @@ export class RouteGenerator {
      * @param {string} mode - Mode de transport
      * @returns {Promise<Object>} Données du parcours avec détours
      */
-    async generateRouteWithDetours(startPoint, endPoint, targetDistance, mode) {
+    async generateRouteWithDetours(startPoint, endPoint, targetDistance, mode, options = {}) {
         console.log('Génération de détours...');
         
         const maxAttempts = CONFIG.ROUTE_GENERATION.MAX_ATTEMPTS;
@@ -274,7 +290,16 @@ export class RouteGenerator {
                 );
                 
                 if (detourWaypoints.length > 0) {
-                    const routePoints = [startPoint, ...detourWaypoints, endPoint];
+                    // Intégrer les POI dans les détours
+                    const { pois = [] } = options;
+                    let routePoints = [startPoint, ...detourWaypoints, endPoint];
+                    
+                    if (pois.length > 0) {
+                        // Insérer les POI entre le départ et les détours
+                        const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                        routePoints = [startPoint, ...poiPoints, ...detourWaypoints, endPoint];
+                    }
+                    
                     const routeData = await this.apiService.calculateRoute(routePoints, mode);
                     const deviation = Math.abs(routeData.distance - targetDistance);
                     
@@ -338,11 +363,8 @@ export class RouteGenerator {
             const lat = centerPoint.lat + Math.cos(angle) * currentRadius;
             const lng = centerPoint.lng + Math.sin(angle) * currentRadius;
             
-            const waypoint = await this.apiService.snapToRoad({ lat, lng }, mode);
-            if (waypoint) {
-                waypoints.push(waypoint);
-                await this.delay(CONFIG.ROUTE_GENERATION.WAYPOINTS.DELAY_BETWEEN_API_CALLS);
-            }
+            // Utiliser directement les coordonnées calculées - Google Maps s'occupe de l'alignement
+            waypoints.push({ lat, lng });
         }
         
         return waypoints;

@@ -1,12 +1,52 @@
-import { CONFIG, ConfigUtils } from '../config.js';
+import { CONFIG } from '../config.js';
 
 /**
- * Service de gestion des appels API externes (OSRM et Nominatim)
+ * Service de gestion des appels API Google Maps
+ * (Directions, Geocoding, Places)
  */
 export class ApiService {
     constructor() {
         this.cache = new Map();
         this.setupCacheCleanup();
+        
+        // Initialiser les services Google Maps
+        this.initializeGoogleServices();
+    }
+
+    /**
+     * Initialise les services Google Maps
+     */
+    initializeGoogleServices() {
+        if (typeof google !== 'undefined' && google.maps) {
+            this.directionsService = new google.maps.DirectionsService();
+            this.geocoder = new google.maps.Geocoder();
+            this.placesService = null; // Sera initialisé avec une carte si nécessaire
+            console.log('✅ Services Google Maps initialisés');
+        } else {
+            console.warn('⚠️ Google Maps API non disponible');
+            this.directionsService = null;
+            this.geocoder = null;
+            this.placesService = null;
+        }
+    }
+
+    /**
+     * Convertit le mode de transport de l'application vers Google Maps
+     * @param {string} mode - Mode de l'application ('walking', 'running', 'cycling')
+     * @returns {google.maps.TravelMode} Mode Google Maps
+     */
+    getGoogleTravelMode(mode) {
+        if (!google || !google.maps) {
+            return null;
+        }
+
+        const modeMapping = {
+            'walking': google.maps.TravelMode.WALKING,
+            'running': google.maps.TravelMode.WALKING, // Google Maps n'a pas de mode running spécifique
+            'cycling': google.maps.TravelMode.BICYCLING
+        };
+
+        return modeMapping[mode] || google.maps.TravelMode.WALKING;
     }
 
     /**
@@ -24,67 +64,18 @@ export class ApiService {
     }
 
     /**
-     * Recherche d'adresses via l'API Nominatim
-     * @param {string} query - Terme de recherche
-     * @param {number} limit - Nombre maximum de résultats
-     * @returns {Promise<Array>} Liste des adresses trouvées
-     */
-    async searchAddresses(query, limit = 5) {
-        if (!query || query.length < 2) {
-            return [];
-        }
-
-        const cacheKey = `address_${query}_${limit}`;
-        
-        // Vérifier le cache
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        try {
-            const url = ConfigUtils.buildNominatimUrl('search', {
-                q: query,
-                limit,
-                addressdetails: 1
-            });
-
-            const response = await fetch(url, {
-                headers: ConfigUtils.getDefaultHeaders(),
-                signal: AbortSignal.timeout(CONFIG.TIMEOUTS.API_REQUEST)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            
-            const addresses = data.map(item => ({
-                display_name: item.display_name,
-                lat: parseFloat(item.lat),
-                lng: parseFloat(item.lon || item.lng),
-                type: item.type,
-                importance: item.importance || 0
-            }));
-
-            // Mettre en cache
-            this.cache.set(cacheKey, addresses);
-            
-            return addresses;
-
-        } catch (error) {
-            console.error('Erreur API Nominatim (searchAddresses):', error);
-            return [];
-        }
-    }
-
-    /**
-     * Géocodage inversé - obtient l'adresse depuis des coordonnées
+     * Géocodage inversé - obtient l'adresse depuis des coordonnées via Google Geocoding
      * @param {number} lat - Latitude
      * @param {number} lng - Longitude
      * @returns {Promise<string|null>} Adresse formatée ou null
      */
     async reverseGeocode(lat, lng) {
+        // Si Google Maps n'est pas disponible
+        if (!this.geocoder) {
+            console.warn('⚠️ Google Geocoder non disponible');
+            return null;
+        }
+
         const cacheKey = `reverse_${Math.round(lat * 1000)}_${Math.round(lng * 1000)}`;
         
         // Vérifier le cache
@@ -93,24 +84,38 @@ export class ApiService {
         }
 
         try {
-            const url = ConfigUtils.buildNominatimUrl('reverse', {
-                lat,
-                lon: lng,
-                zoom: 18,
-                addressdetails: 1
+            console.log(`🌍 Géocodage inversé Google Maps: ${lat}, ${lng}`);
+
+            // Effectuer la requête de géocodage inversé
+            const result = await new Promise((resolve, reject) => {
+                this.geocoder.geocode(
+                    { location: { lat, lng } },
+                    (results, status) => {
+                        if (status === google.maps.GeocoderStatus.OK) {
+                            resolve(results);
+                        } else {
+                            reject(new Error(`Geocoder failed: ${status}`));
+                        }
+                    }
+                );
             });
 
-            const response = await fetch(url, {
-                headers: ConfigUtils.getDefaultHeaders(),
-                signal: AbortSignal.timeout(CONFIG.TIMEOUTS.GEOCODING)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            // Extraire la meilleure adresse
+            let address = null;
+            if (result && result.length > 0) {
+                // Prendre la première adresse (la plus précise)
+                address = result[0].formatted_address;
+                
+                // Ou essayer de trouver une adresse de rue plus précise
+                const streetAddress = result.find(r => 
+                    r.types.includes('street_address') || 
+                    r.types.includes('route')
+                );
+                
+                if (streetAddress) {
+                    address = streetAddress.formatted_address;
+                }
             }
-
-            const data = await response.json();
-            const address = data.display_name ? this.formatAddressName(data.display_name) : null;
 
             // Mettre en cache
             this.cache.set(cacheKey, address);
@@ -118,131 +123,15 @@ export class ApiService {
             return address;
 
         } catch (error) {
-            console.warn('Erreur géocodage inversé:', error);
+            console.warn('Erreur géocodage inversé Google Maps:', error);
             return null;
         }
     }
 
     /**
-     * Recherche de POI (Points d'intérêt) dans une zone donnée
-     * @param {string} query - Terme de recherche
-     * @param {Object} centerPoint - Point central de la recherche {lat, lng}
-     * @param {number} radiusKm - Rayon de recherche en km
-     * @returns {Promise<Array>} Liste des POI trouvés
-     */
-    async searchPOIs(query, centerPoint, radiusKm = CONFIG.POI.SEARCH_RADIUS) {
-        if (!query || query.length < CONFIG.POI.MIN_QUERY_LENGTH) {
-            return [];
-        }
-
-        const cacheKey = `poi_${query}_${Math.round(centerPoint.lat * 100)}_${Math.round(centerPoint.lng * 100)}_${radiusKm}`;
-        
-        // Vérifier le cache
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        try {
-            // Calculer la viewbox (approximation)
-            const offset = radiusKm / 111; // Conversion km -> degrés (approximation)
-            
-            const url = ConfigUtils.buildNominatimUrl('search', {
-                q: query,
-                limit: CONFIG.POI.MAX_SEARCH_RESULTS,
-                lat: centerPoint.lat,
-                lon: centerPoint.lng,
-                bounded: 1,
-                viewbox: `${centerPoint.lng - offset},${centerPoint.lat + offset},${centerPoint.lng + offset},${centerPoint.lat - offset}`
-            });
-
-            const response = await fetch(url, {
-                headers: ConfigUtils.getDefaultHeaders(),
-                signal: AbortSignal.timeout(CONFIG.TIMEOUTS.API_REQUEST)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            
-            const pois = data
-                .map(item => ({
-                    name: item.display_name.split(',')[0],
-                    full_name: item.display_name,
-                    lat: parseFloat(item.lat),
-                    lng: parseFloat(item.lon || item.lng),
-                    type: item.type,
-                    class: item.class,
-                    importance: item.importance || 0
-                }))
-                .filter(poi => {
-                    // Filtrer les types intéressants
-                    const interestingTypes = ['tourism', 'amenity', 'leisure', 'historic', 'natural'];
-                    return interestingTypes.includes(poi.class);
-                });
-
-            // Mettre en cache
-            this.cache.set(cacheKey, pois);
-            
-            return pois;
-
-        } catch (error) {
-            console.error('Erreur API POI:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Trouve le point routier le plus proche via OSRM
-     * @param {Object} point - Point à aligner {lat, lng}
-     * @param {string} mode - Mode de transport ('walking', 'running', 'cycling')
-     * @returns {Promise<Object|null>} Point aligné ou point original
-     */
-    async snapToRoad(point, mode) {
-        // Clé de cache basée sur position arrondie (précision selon CONFIG)
-        const lat = Math.round(point.lat * CONFIG.CACHE.PRECISION) / CONFIG.CACHE.PRECISION;
-        const lng = Math.round(point.lng * CONFIG.CACHE.PRECISION) / CONFIG.CACHE.PRECISION;
-        const profile = ConfigUtils.getModeConfig(mode).profile;
-        const cacheKey = `snap_${profile}_${lat}_${lng}`;
-        
-        // Vérifier le cache
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        try {
-            const url = ConfigUtils.buildOSRMUrl('nearest', profile, `${point.lng},${point.lat}`, {
-                number: 1
-            });
-
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            let result = point; // Point original par défaut
-            
-            if (data.code === 'Ok' && data.waypoints && data.waypoints.length > 0) {
-                const wp = data.waypoints[0];
-                result = {
-                    lat: wp.location[1],
-                    lng: wp.location[0]
-                };
-            }
-            
-            // Mettre en cache
-            this.cache.set(cacheKey, result);
-            return result;
-            
-        } catch (error) {
-            console.warn('Erreur snap to road:', error);
-            return point; // Retourner le point original en cas d'erreur
-        }
-    }
-
-    /**
-     * Calcule un itinéraire complet via l'API OSRM
+     * Calcule un itinéraire complet via l'API Google Maps Directions
      * @param {Array} points - Liste des points de passage [{lat, lng}, ...]
-     * @param {string} mode - Mode de transport
+     * @param {string} mode - Mode de transport ('walking', 'running', 'cycling')
      * @returns {Promise<Object>} Données de l'itinéraire {route: [...], distance: number, duration: number}
      */
     async calculateRoute(points, mode) {
@@ -250,181 +139,129 @@ export class ApiService {
             throw new Error('Au moins 2 points requis pour calculer un itinéraire');
         }
 
-        const profile = ConfigUtils.getModeConfig(mode).profile;
-        const coordinates = points.map(p => `${p.lng},${p.lat}`).join(';');
-        const cacheKey = `route_${profile}_${coordinates}`;
+        // Si Google Maps n'est pas disponible, lancer une erreur
+        if (!this.directionsService) {
+            throw new Error('Google Maps Directions Service non disponible');
+        }
 
-        // Vérifier le cache pour les itinéraires courts (éviter de cacher les longs)
+        const coordinates = points.map(p => `${p.lat},${p.lng}`).join(';');
+        const cacheKey = `gmaps_route_${mode}_${coordinates}`;
+
+        // Vérifier le cache pour les itinéraires courts
         if (points.length <= 5 && this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = ConfigUtils.buildOSRMUrl('route', profile, coordinates, {
-                overview: 'full',
-                geometries: 'geojson'
-            });
-
-            console.log(`🛣️ Appel OSRM: ${url}`);
-
-            const response = await fetch(url, {
-                signal: AbortSignal.timeout(CONFIG.TIMEOUTS.API_REQUEST)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
-                throw new Error(data.message || 'Aucun itinéraire trouvé');
-            }
-
-            const route = data.routes[0];
-            const geometry = route.geometry;
-
-            // Convertir les coordonnées en format attendu par Leaflet
-            const routePoints = geometry.coordinates.map(coord => ({
-                lat: coord[1],
-                lng: coord[0]
+            // Préparer la requête Google Maps
+            const origin = new google.maps.LatLng(points[0].lat, points[0].lng);
+            const destination = new google.maps.LatLng(points[points.length - 1].lat, points[points.length - 1].lng);
+            
+            // Points intermédiaires (waypoints)
+            const waypoints = points.slice(1, -1).map(point => ({
+                location: new google.maps.LatLng(point.lat, point.lng),
+                stopover: true
             }));
 
-            const result = {
+            const request = {
+                origin: origin,
+                destination: destination,
+                waypoints: waypoints,
+                travelMode: this.getGoogleTravelMode(mode),
+                unitSystem: google.maps.UnitSystem.METRIC,
+                avoidHighways: mode === 'walking' || mode === 'running', // Éviter les autoroutes pour la marche/course
+                avoidTolls: true,
+                optimizeWaypoints: waypoints.length > 0 // Optimiser l'ordre des waypoints si présents
+            };
+
+            console.log(`🛣️ Appel Google Maps Directions API: ${points.length} points, mode: ${mode}`);
+
+            // Effectuer la requête
+            const result = await new Promise((resolve, reject) => {
+                this.directionsService.route(request, (response, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        resolve(response);
+                    } else {
+                        reject(new Error(`Directions service failed: ${status}`));
+                    }
+                });
+            });
+
+            // Extraire la route principale
+            const route = result.routes[0];
+
+            // Extraire tous les points de la route
+            const routePoints = [];
+            route.legs.forEach(leg => {
+                leg.steps.forEach(step => {
+                    // Ajouter le point de départ du step
+                    routePoints.push({
+                        lat: step.start_location.lat(),
+                        lng: step.start_location.lng()
+                    });
+                    
+                    // Ajouter tous les points intermédiaires du polyline
+                    if (step.path && step.path.length > 0) {
+                        step.path.forEach(point => {
+                            routePoints.push({
+                                lat: point.lat(),
+                                lng: point.lng()
+                            });
+                        });
+                    }
+                });
+            });
+
+            // Ajouter le dernier point
+            if (route.legs.length > 0) {
+                const lastLeg = route.legs[route.legs.length - 1];
+                routePoints.push({
+                    lat: lastLeg.end_location.lat(),
+                    lng: lastLeg.end_location.lng()
+                });
+            }
+
+            // Calculer distance et durée totales
+            let totalDistance = 0; // en mètres
+            let totalDuration = 0; // en secondes
+
+            route.legs.forEach(leg => {
+                totalDistance += leg.distance.value;
+                totalDuration += leg.duration.value;
+            });
+
+            const routeData = {
                 route: routePoints,
-                distance: route.distance / 1000, // Conversion en km
-                duration: route.duration / 60    // Conversion en minutes
+                distance: totalDistance / 1000, // Conversion en km
+                duration: totalDuration / 60    // Conversion en minutes
             };
 
             // Mettre en cache seulement les itinéraires courts
             if (points.length <= 5) {
-                this.cache.set(cacheKey, result);
+                this.cache.set(cacheKey, routeData);
             }
 
-            console.log(`✅ Itinéraire calculé: ${routePoints.length} points, ${result.distance.toFixed(1)}km`);
+            console.log(`✅ Itinéraire Google Maps calculé: ${routePoints.length} points, ${routeData.distance.toFixed(1)}km`);
             
-            return result;
+            return routeData;
 
         } catch (error) {
-            console.error('Erreur API OSRM (calculateRoute):', error);
+            console.error('Erreur API Google Maps Directions:', error);
             throw new Error(`Impossible de calculer l'itinéraire: ${error.message}`);
         }
     }
 
     /**
-     * Recherche multiple de POI par catégorie
-     * @param {string} category - Catégorie de POI
-     * @param {Object} centerPoint - Point central
-     * @param {number} maxResults - Nombre maximum de résultats par requête
-     * @returns {Promise<Array>} Liste des POI trouvés
+     * Initialise un service Places (nécessite une carte)
+     * @param {google.maps.Map} map - Instance de carte Google Maps
      */
-    async searchPOIsByCategory(category, centerPoint, maxResults = 3) {
-        const categoryConfig = CONFIG.POI.CATEGORIES[category];
-        if (!categoryConfig) {
-            console.warn(`Catégorie POI inconnue: ${category}`);
-            return [];
+    initializePlacesService(map) {
+        if (google && google.maps && map) {
+            this.placesService = new google.maps.places.PlacesService(map);
+            console.log('✅ Google Places Service initialisé');
+        } else {
+            console.warn('⚠️ Impossible d\'initialiser Google Places Service');
         }
-
-        const allPOIs = [];
-
-        try {
-            for (const query of categoryConfig.queries) {
-                const pois = await this.searchPOIs(query, centerPoint);
-                
-                // Prendre les meilleurs résultats
-                const filteredPOIs = pois
-                    .filter(poi => !allPOIs.some(existing => 
-                        Math.abs(existing.lat - poi.lat) < 0.001 && 
-                        Math.abs(existing.lng - poi.lng) < 0.001
-                    ))
-                    .slice(0, Math.max(1, Math.floor(maxResults / categoryConfig.queries.length)));
-
-                for (const poi of filteredPOIs) {
-                    poi.category = category; // Marquer la catégorie
-                    allPOIs.push(poi);
-                }
-
-                // Délai entre les requêtes pour éviter de surcharger l'API
-                await new Promise(resolve => setTimeout(resolve, CONFIG.ROUTE_GENERATION.WAYPOINTS.DELAY_BETWEEN_API_CALLS));
-            }
-
-            return allPOIs;
-
-        } catch (error) {
-            console.error(`Erreur recherche POI catégorie ${category}:`, error);
-            return [];
-        }
-    }
-
-    /**
-     * Formate le nom d'une adresse pour l'affichage
-     * @param {string} displayName - Nom complet de l'adresse
-     * @returns {string} Nom formaté
-     */
-    formatAddressName(displayName) {
-        if (!displayName) return '';
-        const parts = displayName.split(',');
-        return parts[0] + (parts[1] ? ', ' + parts[1] : '');
-    }
-
-    /**
-     * Extrait les détails d'une adresse
-     * @param {string} displayName - Nom complet de l'adresse  
-     * @returns {string} Détails de l'adresse
-     */
-    getAddressDetails(displayName) {
-        if (!displayName) return '';
-        const parts = displayName.split(',');
-        return parts.slice(2).join(',').trim();
-    }
-
-    /**
-     * Obtient l'icône pour un type de POI
-     * @param {string} type - Type de POI
-     * @returns {string} Emoji/icône correspondant
-     */
-    getPOITypeIcon(type) {
-        const icons = {
-            attraction: '🎯',
-            museum: '🏛️',
-            park: '🌳',
-            restaurant: '🍽️',
-            cafe: '☕',
-            shop: '🛒',
-            church: '⛪',
-            monument: '🏛️',
-            fountain: '⛲',
-            garden: '🌺',
-            default: '📍'
-        };
-        return icons[type] || icons.default;
-    }
-
-    /**
-     * Formate le type de POI pour l'affichage
-     * @param {string} type - Type de POI
-     * @param {string} poiClass - Classe de POI
-     * @returns {string} Type formaté en français
-     */
-    formatPOIType(type, poiClass) {
-        const translations = {
-            attraction: 'Attraction',
-            museum: 'Musée',
-            park: 'Parc',
-            restaurant: 'Restaurant',
-            cafe: 'Café',
-            shop: 'Commerce',
-            church: 'Église',
-            monument: 'Monument',
-            fountain: 'Fontaine',
-            garden: 'Jardin',
-            tourism: 'Tourisme',
-            amenity: 'Service',
-            leisure: 'Loisir',
-            historic: 'Historique',
-            natural: 'Nature'
-        };
-        return translations[type] || translations[poiClass] || type;
     }
 
     /**
@@ -446,4 +283,271 @@ export class ApiService {
             usage: `${Math.round((this.cache.size / CONFIG.CACHE.MAX_SIZE) * 100)}%`
         };
     }
+
+    /**
+     * Recherche de POI par catégorie avec Google Places
+     * @param {string} category - Catégorie de POI ('nature', 'culture', 'sport', etc.)
+     * @param {Object} centerPoint - Point central de recherche {lat, lng}
+     * @param {number} radiusKm - Rayon de recherche en km
+     * @returns {Promise<Array>} Liste des POI trouvés
+     */
+    async searchPOIsByCategory(category, centerPoint, radiusKm = 2) {
+        if (!this.placesService) {
+            console.warn('⚠️ Google Places Service non disponible pour la recherche POI');
+            return [];
+        }
+
+        // Mapping des catégories vers les types/mots-clés Google Places
+        const categoryMapping = {
+            'nature': {
+                types: ['park'],
+                keywords: ['parc', 'jardin', 'nature', 'forêt', 'lac']
+            },
+            'culture': {
+                types: ['museum', 'tourist_attraction', 'church'],
+                keywords: ['musée', 'monument', 'église', 'château', 'cathédrale']
+            },
+            'sport': {
+                types: ['gym', 'stadium'],
+                keywords: ['stade', 'piscine', 'terrain de sport', 'salle de sport']
+            },
+            'panorama': {
+                types: ['tourist_attraction'],
+                keywords: ['belvédère', 'point de vue', 'observatoire', 'tour']
+            },
+            'eau': {
+                types: ['park'],
+                keywords: ['fontaine', 'lac', 'rivière', 'étang', 'bassin']
+            },
+            'shopping': {
+                types: ['shopping_mall', 'store'],
+                keywords: ['centre commercial', 'magasin', 'boutique']
+            }
+        };
+
+        const config = categoryMapping[category];
+        if (!config) {
+            console.warn(`Catégorie POI inconnue: ${category}`);
+            return [];
+        }
+
+        const cacheKey = `poi_category_${category}_${Math.round(centerPoint.lat * 100)}_${Math.round(centerPoint.lng * 100)}_${radiusKm}`;
+        
+        // Vérifier le cache
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        try {
+            // Paramètres de recherche
+            const request = {
+                location: new google.maps.LatLng(centerPoint.lat, centerPoint.lng),
+                radius: radiusKm * 1000, // Conversion km -> mètres
+                types: config.types
+            };
+
+            console.log(`🔍 Recherche Google Places POI: ${category} dans ${radiusKm}km`);
+
+            // Effectuer la recherche
+            const results = await new Promise((resolve, reject) => {
+                this.placesService.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results || []);
+                    } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                        resolve([]);
+                    } else {
+                        reject(new Error(`Places search failed: ${status}`));
+                    }
+                });
+            });
+
+            // Formater les résultats
+            const formattedResults = results
+                .filter(place => place.geometry && place.geometry.location)
+                .map(place => ({
+                    name: place.name,
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng(),
+                    type: place.types[0] || 'point_of_interest',
+                    rating: place.rating || 0,
+                    vicinity: place.vicinity || '',
+                    place_id: place.place_id,
+                    category: category
+                }))
+                .slice(0, 5); // Limiter à 5 résultats
+
+            // Mettre en cache
+            this.cache.set(cacheKey, formattedResults);
+            
+            console.log(`✅ ${formattedResults.length} POI ${category} trouvés`);
+            return formattedResults;
+
+        } catch (error) {
+            console.error(`Erreur recherche POI ${category}:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * Recherche personnalisée de POI avec Google Places Text Search
+     * @param {string} query - Terme de recherche
+     * @param {Object} centerPoint - Point central de recherche {lat, lng}
+     * @param {number} radiusKm - Rayon de recherche en km
+     * @returns {Promise<Array>} Liste des POI trouvés
+     */
+    async searchCustomPOI(query, centerPoint, radiusKm = 2) {
+        if (!this.placesService) {
+            console.warn('⚠️ Google Places Service non disponible pour la recherche POI');
+            return [];
+        }
+
+        if (!query || query.length < 2) {
+            return [];
+        }
+
+        const cacheKey = `poi_custom_${query}_${Math.round(centerPoint.lat * 100)}_${Math.round(centerPoint.lng * 100)}_${radiusKm}`;
+        
+        // Vérifier le cache
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        try {
+            // Paramètres de recherche
+            const request = {
+                query: query,
+                location: new google.maps.LatLng(centerPoint.lat, centerPoint.lng),
+                radius: radiusKm * 1000 // Conversion km -> mètres
+            };
+
+            console.log(`🔍 Recherche Google Places POI personnalisé: "${query}"`);
+
+            // Effectuer la recherche
+            const results = await new Promise((resolve, reject) => {
+                this.placesService.textSearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results || []);
+                    } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                        resolve([]);
+                    } else {
+                        reject(new Error(`Places text search failed: ${status}`));
+                    }
+                });
+            });
+
+            // Formater les résultats
+            const formattedResults = results
+                .filter(place => place.geometry && place.geometry.location)
+                .map(place => ({
+                    name: place.name,
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng(),
+                    type: place.types[0] || 'point_of_interest',
+                    rating: place.rating || 0,
+                    formatted_address: place.formatted_address || '',
+                    place_id: place.place_id,
+                    category: 'custom'
+                }))
+                .slice(0, 8); // Limiter à 8 résultats
+
+            // Mettre en cache
+            this.cache.set(cacheKey, formattedResults);
+            
+            console.log(`✅ ${formattedResults.length} POI personnalisés trouvés pour "${query}"`);
+            return formattedResults;
+
+        } catch (error) {
+            console.error('Erreur recherche POI personnalisée:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Obtient l'icône pour un type de POI Google Places
+     * @param {string} type - Type de POI
+     * @returns {string} Emoji/icône correspondant
+     */
+    getPOITypeIcon(type) {
+        const icons = {
+            // Types Google Places
+            'tourist_attraction': '🎯',
+            'museum': '🏛️',
+            'park': '🌳',
+            'restaurant': '🍽️',
+            'cafe': '☕',
+            'shopping_mall': '🛒',
+            'store': '🛍️',
+            'church': '⛪',
+            'stadium': '🏟️',
+            'gym': '🏋️',
+            'amusement_park': '🎢',
+            'zoo': '🦁',
+            'aquarium': '🐠',
+            'library': '📚',
+            'hospital': '🏥',
+            'pharmacy': '💊',
+            'bank': '🏦',
+            'gas_station': '⛽',
+            // Fallbacks
+            'point_of_interest': '📍',
+            'default': '📍'
+        };
+        return icons[type] || icons.default;
+    }
+
+    /**
+     * Formate le type de POI pour l'affichage
+     * @param {string} type - Type de POI Google Places
+     * @returns {string} Type formaté en français
+     */
+    formatPOIType(type) {
+        const translations = {
+            'tourist_attraction': 'Attraction touristique',
+            'museum': 'Musée',
+            'park': 'Parc',
+            'restaurant': 'Restaurant',
+            'cafe': 'Café',
+            'shopping_mall': 'Centre commercial',
+            'store': 'Magasin',
+            'church': 'Église',
+            'stadium': 'Stade',
+            'gym': 'Salle de sport',
+            'amusement_park': 'Parc d\'attractions',
+            'zoo': 'Zoo',
+            'aquarium': 'Aquarium',
+            'library': 'Bibliothèque',
+            'hospital': 'Hôpital',
+            'pharmacy': 'Pharmacie',
+            'bank': 'Banque',
+            'gas_station': 'Station essence',
+            'point_of_interest': 'Point d\'intérêt'
+        };
+        return translations[type] || type;
+    }
+
+    /**
+     * Vérifie si les services Google Maps sont disponibles
+     * @returns {Object} État des services
+     */
+    getServicesStatus() {
+        return {
+            directionsService: !!this.directionsService,
+            geocoder: !!this.geocoder,
+            placesService: !!this.placesService,
+            googleMapsLoaded: !!(typeof google !== 'undefined' && google.maps)
+        };
+    }
 }
+
+/* ===== ANCIEN CODE NOMINATIM/OVERPASS SUPPRIMÉ =====
+
+Les méthodes suivantes ont été supprimées car elles seront remplacées par :
+- searchAddresses() -> Google Places Autocomplete (dans UIManager)
+- searchPOIs() -> Google Places API (future implémentation) 
+- searchPOIsByCategory() -> Google Places API (future implémentation)
+- snapToRoad() -> Google Roads API (future implémentation)
+- formatAddressName() -> Géré par Google Geocoder
+- getPOITypeIcon() -> Sera déplacé dans les utilitaires UI
+- formatPOIType() -> Sera déplacé dans les utilitaires UI
+
+===== FIN ANCIEN CODE ===== */

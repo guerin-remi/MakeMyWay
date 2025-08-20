@@ -84,9 +84,9 @@ class MakeMyWayApp {
         console.log('🔍 Vérification des prérequis...');
         
         // Vérifier Leaflet
-        if (typeof L === 'undefined') {
+        /*if (typeof L === 'undefined') {
             throw new Error('Leaflet n\'est pas chargé. Vérifiez que la bibliothèque est incluse.');
-        }
+        }*/
         
         // Vérifier le conteneur de carte
         const mapContainer = document.getElementById('map');
@@ -109,19 +109,16 @@ class MakeMyWayApp {
     async _initializeServices() {
         console.log('🔧 Initialisation des services...');
         
-        // Service API
+        // Service API Google Maps
         this.modules.apiService = new ApiService();
-        console.log('✅ ApiService initialisé');
+        console.log('✅ ApiService Google Maps initialisé');
         
-        // Test de connectivité API (optionnel)
-        try {
-            const testAddresses = await this.modules.apiService.searchAddresses('Paris', 1);
-            if (testAddresses.length > 0) {
-                console.log('✅ Connectivité API vérifiée');
-            }
-        } catch (error) {
-            console.warn('⚠️ Test de connectivité API échoué:', error.message);
-            // Ne pas bloquer l'initialisation pour autant
+        // Vérifier que les services Google Maps sont disponibles
+        const servicesStatus = this.modules.apiService.getServicesStatus();
+        if (servicesStatus.googleMapsLoaded) {
+            console.log('✅ Services Google Maps disponibles');
+        } else {
+            console.warn('⚠️ Services Google Maps non disponibles');
         }
     }
 
@@ -449,7 +446,7 @@ class MakeMyWayApp {
 }
 
 /**
- * Fonction d'initialisation globale
+ * Fonction d'initialisation globale de l'application
  */
 async function initializeMakeMyWay() {
     try {
@@ -475,16 +472,33 @@ async function initializeMakeMyWay() {
     }
 }
 
+// Cette ligne a été supprimée car initMap sera défini dans index.html
+
 /**
- * Démarrage automatique quand le DOM est prêt
+ * Démarrage automatique quand le DOM est prêt (fallback si Google Maps ne charge pas)
  */
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeMakeMyWay);
-} else {
-    // Le DOM est déjà chargé
-    initializeMakeMyWay().catch(error => {
-        console.error('Erreur de démarrage:', error);
+    document.addEventListener('DOMContentLoaded', () => {
+        // Attendre un peu pour voir si Google Maps se charge
+        setTimeout(() => {
+            if (!window.google || !window.google.maps) {
+                console.warn('⚠️ Google Maps non détecté, tentative d\'initialisation sans Google Maps');
+                initializeMakeMyWay().catch(error => {
+                    console.error('Erreur de démarrage:', error);
+                });
+            }
+        }, 2000);
     });
+} else {
+    // Le DOM est déjà chargé, attendre Google Maps
+    setTimeout(() => {
+        if (!window.google || !window.google.maps) {
+            console.warn('⚠️ Google Maps non détecté, tentative d\'initialisation sans Google Maps');
+            initializeMakeMyWay().catch(error => {
+                console.error('Erreur de démarrage:', error);
+            });
+        }
+    }, 2000);
 }
 
 // Export pour utilisation en tant que module
