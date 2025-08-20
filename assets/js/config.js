@@ -4,20 +4,10 @@
 
 export const CONFIG = {
     // APIs
-    OSRM: {
-        BASE_URL: 'https://router.project-osrm.org',
-        PROFILES: {
-            WALKING: 'foot',
-            RUNNING: 'foot',
-            CYCLING: 'bike'
-        }
-    },
-
-    NOMINATIM: {
-        BASE_URL: 'https://nominatim.openstreetmap.org',
-        USER_AGENT: 'MakeMyWay/1.0',
-        COUNTRY_CODES: 'fr',
-        LANGUAGE: 'fr'
+    GOOGLE_MAPS: {
+        // Configuration Google Maps gérée dans index.html
+        DEFAULT_COUNTRY: 'fr',
+        DEFAULT_LANGUAGE: 'fr'
     },
 
     // Configuration de la carte
@@ -25,9 +15,7 @@ export const CONFIG = {
         DEFAULT_CENTER: [48.8566, 2.3522], // Paris
         DEFAULT_ZOOM: 12,
         MIN_ZOOM: 5,
-        MAX_ZOOM: 19,
-        TILE_LAYER: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        ATTRIBUTION: '© OpenStreetMap contributors'
+        MAX_ZOOM: 19
     },
 
     // Vitesses moyennes par mode (km/h)
@@ -188,7 +176,6 @@ export const ConfigUtils = {
         return {
             speed: CONFIG.SPEEDS[mode] || CONFIG.SPEEDS.walking,
             limits: CONFIG.DISTANCE_LIMITS[mode] || CONFIG.DISTANCE_LIMITS.walking,
-            profile: CONFIG.OSRM.PROFILES[mode.toUpperCase()] || CONFIG.OSRM.PROFILES.WALKING,
             searchRadius: CONFIG.ROUTE_GENERATION.SEARCH_RADIUS[mode] || CONFIG.ROUTE_GENERATION.SEARCH_RADIUS.walking
         };
     },
@@ -204,36 +191,12 @@ export const ConfigUtils = {
     },
 
     /**
-     * Construit une URL complète pour l'API OSRM
+     * Obtient les options par défaut pour Google Maps
      */
-    buildOSRMUrl(endpoint, profile, coordinates, options = {}) {
-        const baseUrl = `${CONFIG.OSRM.BASE_URL}/${endpoint}/v1/${profile}/${coordinates}`;
-        const params = new URLSearchParams(options);
-        return params.toString() ? `${baseUrl}?${params}` : baseUrl;
-    },
-
-    /**
-     * Construit une URL complète pour l'API Nominatim
-     */
-    buildNominatimUrl(endpoint, params = {}) {
-        const defaultParams = {
-            format: 'json',
-            countrycodes: CONFIG.NOMINATIM.COUNTRY_CODES,
-            'accept-language': CONFIG.NOMINATIM.LANGUAGE
-        };
-        
-        const allParams = { ...defaultParams, ...params };
-        const queryString = new URLSearchParams(allParams);
-        return `${CONFIG.NOMINATIM.BASE_URL}/${endpoint}?${queryString}`;
-    },
-
-    /**
-     * Obtient les headers par défaut pour les requêtes
-     */
-    getDefaultHeaders() {
+    getGoogleMapsOptions() {
         return {
-            'Accept-Language': CONFIG.NOMINATIM.LANGUAGE,
-            'User-Agent': CONFIG.NOMINATIM.USER_AGENT
+            language: CONFIG.GOOGLE_MAPS.DEFAULT_LANGUAGE,
+            region: CONFIG.GOOGLE_MAPS.DEFAULT_COUNTRY
         };
     }
 };

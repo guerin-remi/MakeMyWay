@@ -75,44 +75,6 @@ export class MapManager {
         }
     }
 
-    /* ===== ANCIEN CODE LEAFLET (COMMENTÉ) =====
-    async initialize(containerId = 'map') {
-        if (typeof L === 'undefined') {
-            throw new Error('Leaflet n\'est pas chargé');
-        }
-
-        const mapContainer = document.getElementById(containerId);
-        if (!mapContainer) {
-            throw new Error(`Conteneur de carte non trouvé: ${containerId}`);
-        }
-
-        try {
-            // Créer la carte
-            this.map = L.map(containerId).setView(CONFIG.MAP.DEFAULT_CENTER, CONFIG.MAP.DEFAULT_ZOOM);
-            
-            // Ajouter les tuiles
-            L.tileLayer(CONFIG.MAP.TILE_LAYER, {
-                attribution: CONFIG.MAP.ATTRIBUTION,
-                maxZoom: CONFIG.MAP.MAX_ZOOM,
-                minZoom: CONFIG.MAP.MIN_ZOOM
-            }).addTo(this.map);
-
-            // Désactiver les contrôles de zoom par défaut
-            if (this.map.zoomControl) {
-                this.map.zoomControl.remove();
-            }
-
-            // Configurer les événements
-            this.setupMapEvents();
-            
-            console.log('🗺️ Carte initialisée');
-
-        } catch (error) {
-            console.error('Erreur initialisation carte:', error);
-            throw error;
-        }
-    }
-    ===== FIN ANCIEN CODE LEAFLET ===== */
 
     /**
      * Configure les événements de la carte Google Maps
@@ -138,21 +100,6 @@ export class MapManager {
         });
     }
 
-    /* ===== ANCIEN CODE LEAFLET (COMMENTÉ) =====
-    setupMapEvents() {
-        // Clic sur la carte
-        this.map.on('click', (e) => {
-            if (this.onMapClick) {
-                this.onMapClick(e.latlng);
-            }
-        });
-
-        // Événements de redimensionnement
-        this.map.on('resize', () => {
-            this.map.invalidateSize();
-        });
-    }
-    ===== FIN ANCIEN CODE LEAFLET ===== */
 
     /**
      * Définit le callback pour les clics sur la carte
@@ -521,7 +468,11 @@ export class MapManager {
         this.clearRoute();
 
         // Retourner à la vue par défaut
-        this.map.setView(CONFIG.MAP.DEFAULT_CENTER, CONFIG.MAP.DEFAULT_ZOOM);
+        this.map.setCenter({ 
+            lat: CONFIG.MAP.DEFAULT_CENTER[0], 
+            lng: CONFIG.MAP.DEFAULT_CENTER[1] 
+        });
+        this.map.setZoom(CONFIG.MAP.DEFAULT_ZOOM);
         
         console.log('🔄 Carte remise à zéro');
     }
@@ -558,9 +509,10 @@ export class MapManager {
      */
     centerOn(latlng, zoom = null) {
         if (zoom !== null) {
-            this.map.setView(latlng, zoom);
+            this.map.setCenter({ lat: latlng.lat, lng: latlng.lng });
+            this.map.setZoom(zoom);
         } else {
-            this.map.panTo(latlng);
+            this.map.panTo({ lat: latlng.lat, lng: latlng.lng });
         }
     }
 
@@ -571,19 +523,26 @@ export class MapManager {
      * @param {Array} padding - Padding optionnel
      */
     fitTwoPoints(point1, point2, padding = [50, 50]) {
-        const bounds = L.latLngBounds([point1, point2]);
-        this.map.fitBounds(bounds, { padding });
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend({ lat: point1.lat, lng: point1.lng });
+        bounds.extend({ lat: point2.lat, lng: point2.lng });
+        this.map.fitBounds(bounds, { 
+            top: padding[0], 
+            right: padding[1] || padding[0], 
+            bottom: padding[0], 
+            left: padding[1] || padding[0] 
+        });
     }
 
     /**
      * Contrôles de zoom
      */
     zoomIn() {
-        this.map.zoomIn();
+        this.map.setZoom(this.map.getZoom() + 1);
     }
 
     zoomOut() {
-        this.map.zoomOut();
+        this.map.setZoom(this.map.getZoom() - 1);
     }
 
     /**
@@ -687,48 +646,3 @@ export class MapManager {
     }
 }
 
-/* ===== ANCIEN CODE LEAFLET (COMMENTÉ POUR RÉFÉRENCE) =====
-
-// Exemple d'ancien code de marqueur Leaflet:
-setStartMarker(latlng) {
-    this.removeStartMarker();
-    this.markers.start = L.marker(latlng, {
-        icon: L.divIcon({
-            html: '<div class="custom-marker-start"><i class="fas fa-play"></i></div>',
-            className: 'custom-marker-container',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        }),
-        draggable: true
-    }).addTo(this.map);
-    
-    this.markers.start.on('dragend', (e) => {
-        const newPos = e.target.getLatLng();
-        if (this.onMarkerMove) {
-            this.onMarkerMove('start', newPos);
-        }
-    });
-}
-
-// Suppression marqueur Leaflet:
-removeStartMarker() {
-    if (this.markers.start) {
-        this.map.removeLayer(this.markers.start);
-        this.markers.start = null;
-    }
-}
-
-// POI Leaflet:
-addPOIMarker(poi) {
-    const marker = L.circleMarker([poi.lat, poi.lng], {
-        radius: 8,
-        fillColor: '#F59E0B',
-        color: 'white',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8
-    }).addTo(this.map);
-    return marker;
-}
-
-===== FIN ANCIEN CODE LEAFLET ===== */

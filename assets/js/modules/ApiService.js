@@ -539,15 +539,3 @@ export class ApiService {
     }
 }
 
-/* ===== ANCIEN CODE NOMINATIM/OVERPASS SUPPRIMÉ =====
-
-Les méthodes suivantes ont été supprimées car elles seront remplacées par :
-- searchAddresses() -> Google Places Autocomplete (dans UIManager)
-- searchPOIs() -> Google Places API (future implémentation) 
-- searchPOIsByCategory() -> Google Places API (future implémentation)
-- snapToRoad() -> Google Roads API (future implémentation)
-- formatAddressName() -> Géré par Google Geocoder
-- getPOITypeIcon() -> Sera déplacé dans les utilitaires UI
-- formatPOIType() -> Sera déplacé dans les utilitaires UI
-
-===== FIN ANCIEN CODE ===== */
