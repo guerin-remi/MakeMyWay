@@ -4,10 +4,29 @@
  */
 export class AuthService {
     constructor() {
-        this.baseURL = 'http://localhost:3001/api/auth';
+        // Détection automatique de l'environnement
+        this.baseURL = this.getApiBaseUrl();
         this.token = localStorage.getItem('makemyway_token');
         this.user = this.loadUserFromStorage();
         this.isAuthenticated = !!this.token;
+        
+        console.log(`🔧 AuthService configuré pour: ${this.baseURL}`);
+    }
+
+    /**
+     * Détermine l'URL de l'API selon l'environnement
+     * @returns {string} URL de base de l'API
+     */
+    getApiBaseUrl() {
+        // Si on est sur GitHub Pages ou un domaine de production
+        if (window.location.hostname.includes('github.io') || 
+            window.location.hostname.includes('makemyway') ||
+            window.location.protocol === 'https:') {
+            return 'https://makemyway-backend.onrender.com/api/auth';
+        }
+        
+        // Sinon on est en développement local
+        return 'http://localhost:3001/api/auth';
     }
 
     /**

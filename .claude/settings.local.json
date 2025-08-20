@@ -21,7 +21,9 @@
       "Bash(timeout 10s npm run dev)",
       "Bash(npm uninstall:*)",
       "Bash(timeout 5s npm run dev)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
