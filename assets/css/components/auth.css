@@ -1,0 +1,276 @@
+/* Styles pour l'authentification utilisateur */
+
+/* Bouton utilisateur dans le header */
+#userBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: auto;
+}
+
+#userBtn span {
+    display: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+@media (min-width: 768px) {
+    #userBtn span {
+        display: block;
+    }
+}
+
+/* Modal overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Container de la modal */
+.modal-container {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow: hidden;
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-container {
+    transform: scale(1) translateY(0);
+}
+
+/* Header de la modal */
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.modal-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-primary);
+    font-size: 1.125rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Contenu de la modal */
+.modal-content {
+    padding: var(--space-5);
+}
+
+/* Actions de la modal */
+.modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}
+
+.modal-actions .btn {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Aide pour les inputs */
+.input-help {
+    display: block;
+    margin-top: var(--space-1);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+/* Menu utilisateur dropdown */
+.user-menu {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+}
+
+.user-menu.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Info utilisateur */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--border);
+}
+
+.user-info i {
+    font-size: 2rem;
+    color: var(--primary);
+}
+
+.user-details {
+    flex: 1;
+}
+
+.user-details span {
+    display: block;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.user-details small {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+/* Actions utilisateur */
+.user-actions {
+    padding: var(--space-3);
+}
+
+.user-actions .btn {
+    width: 100%;
+    justify-content: center;
+}
+
+/* État connecté du bouton utilisateur */
+#userBtn.logged-in {
+    background: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary);
+}
+
+#userBtn.logged-in:hover {
+    background: rgba(var(--primary-rgb), 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modal-container {
+        width: 95%;
+        margin: var(--space-4);
+    }
+    
+    .modal-content {
+        padding: var(--space-4);
+    }
+    
+    .user-menu {
+        right: -50px;
+        min-width: 180px;
+    }
+}
+
+/* Animation de chargement pour les boutons */
+.btn.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    color: white;
+}
+
+@keyframes spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* Messages d'erreur */
+.error-message {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-3);
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.error-message i {
+    color: #dc2626;
+}
+
+/* Messages de succès */
+.success-message {
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-3);
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.success-message i {
+    color: #059669;
+}

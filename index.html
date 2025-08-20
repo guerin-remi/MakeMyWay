@@ -45,6 +45,7 @@
     <link rel="stylesheet" href="assets/css/components/panel.css">
     <link rel="stylesheet" href="assets/css/components/map.css">
     <link rel="stylesheet" href="assets/css/components/results.css">
+    <link rel="stylesheet" href="assets/css/components/auth.css">
 </head>
 <body>
     <!-- Container principal avec carte plein écran -->
@@ -75,6 +76,10 @@
                 <h1>MakeMyWay</h1>
             </div>
             <div class="header-controls">
+                <button class="floating-btn" id="userBtn" title="Mon compte">
+                    <i class="fas fa-user"></i>
+                    <span id="userBtnText">Connexion</span>
+                </button>
                 <button class="floating-btn" id="settingsBtn" title="Paramètres">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -315,6 +320,94 @@
             <div class="loading-content">
                 <i class="fas fa-spinner loading-spinner"></i>
                 <p>Génération du parcours en cours...</p>
+            </div>
+        </div>
+
+        <!-- Modal de connexion -->
+        <div class="modal-overlay" id="loginModal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sign-in-alt"></i> Connexion</h3>
+                    <button class="modal-close" id="closeLogin">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <form id="loginForm">
+                        <div class="input-group">
+                            <label for="loginEmail" class="input-label">Email</label>
+                            <input type="email" id="loginEmail" class="input" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="loginPassword" class="input-label">Mot de passe</label>
+                            <input type="password" id="loginPassword" class="input" required>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Se connecter
+                            </button>
+                            <button type="button" class="btn btn-ghost" id="showRegister">
+                                Pas de compte ? S'inscrire
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal d'inscription -->
+        <div class="modal-overlay" id="registerModal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-plus"></i> Inscription</h3>
+                    <button class="modal-close" id="closeRegister">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <form id="registerForm">
+                        <div class="input-group">
+                            <label for="registerName" class="input-label">Nom</label>
+                            <input type="text" id="registerName" class="input" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="registerEmail" class="input-label">Email</label>
+                            <input type="email" id="registerEmail" class="input" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="registerPassword" class="input-label">Mot de passe</label>
+                            <input type="password" id="registerPassword" class="input" required minlength="6">
+                            <small class="input-help">Au moins 6 caractères</small>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus"></i>
+                                S'inscrire
+                            </button>
+                            <button type="button" class="btn btn-ghost" id="showLogin">
+                                Déjà un compte ? Se connecter
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu utilisateur -->
+        <div class="user-menu" id="userMenu">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <div class="user-details">
+                    <span id="userName">Nom d'utilisateur</span>
+                    <small id="userEmail">email@example.com</small>
+                </div>
+            </div>
+            <div class="user-actions">
+                <button class="btn btn-ghost" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Déconnexion
+                </button>
             </div>
         </div>
     </div>

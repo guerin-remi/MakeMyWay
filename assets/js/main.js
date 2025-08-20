@@ -8,6 +8,7 @@ import { ApiService } from './modules/ApiService.js';
 import { MapManager } from './modules/MapManager.js';
 import { RouteGenerator } from './modules/RouteGenerator.js';
 import { UIManager } from './modules/UIManager.js';
+import { AuthUI } from './modules/AuthUI.js';
 
 /**
  * Classe principale de l'application MakeMyWay
@@ -54,13 +55,16 @@ class MakeMyWayApp {
             // 3. Initialiser le générateur de parcours
             this._initializeRouteGenerator();
             
-            // 4. Initialiser l'interface utilisateur
+            // 4. Initialiser l'authentification
+            await this._initializeAuth();
+            
+            // 5. Initialiser l'interface utilisateur
             await this._initializeUI();
             
-            // 5. Connecter les modules
+            // 6. Connecter les modules
             this._connectModules();
             
-            // 6. Configuration finale
+            // 7. Configuration finale
             this._finalizeSetup();
             
             this.isInitialized = true;
@@ -145,6 +149,19 @@ class MakeMyWayApp {
         this.modules.routeGenerator = new RouteGenerator(this.modules.apiService);
         
         console.log('✅ RouteGenerator initialisé');
+    }
+
+    /**
+     * Initialise l'authentification utilisateur
+     * @private
+     */
+    async _initializeAuth() {
+        console.log('🔐 Initialisation de l\'authentification...');
+        
+        this.modules.authUI = new AuthUI();
+        await this.modules.authUI.initialize();
+        
+        console.log('✅ AuthUI initialisé');
     }
 
     /**
@@ -397,8 +414,34 @@ class MakeMyWayApp {
             ui: this.modules.uiManager.getState(),
             map: this.modules.mapManager.getMarkerPositions(),
             lastRoute: this.modules.routeGenerator.getLastRouteMetadata(),
-            apiCache: this.modules.apiService.getCacheStats()
+            apiCache: this.modules.apiService.getCacheStats(),
+            user: this.modules.authUI?.getAuthService()?.getCurrentUser() || null,
+            isLoggedIn: this.modules.authUI?.getAuthService()?.isLoggedIn() || false
         };
+    }
+
+    /**
+     * Obtient l'utilisateur actuellement connecté
+     * @returns {Object|null} Données utilisateur ou null
+     */
+    getCurrentUser() {
+        return this.modules.authUI?.getAuthService()?.getCurrentUser() || null;
+    }
+
+    /**
+     * Vérifie si un utilisateur est connecté
+     * @returns {boolean} True si connecté
+     */
+    isUserLoggedIn() {
+        return this.modules.authUI?.getAuthService()?.isLoggedIn() || false;
+    }
+
+    /**
+     * Obtient le service d'authentification
+     * @returns {AuthService|null} Service d'authentification
+     */
+    getAuthService() {
+        return this.modules.authUI?.getAuthService() || null;
     }
 
     /**

@@ -15,7 +15,13 @@
       "Bash(git push:*)",
       "Bash(git for-each-ref:*)",
       "Bash(git pull:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 10s npm run dev)",
+      "Bash(npm uninstall:*)",
+      "Bash(timeout 5s npm run dev)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
