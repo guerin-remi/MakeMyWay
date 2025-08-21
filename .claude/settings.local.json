@@ -23,7 +23,8 @@
       "Bash(timeout 5s npm run dev)",
       "Bash(node:*)",
       "Bash(curl:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(del test-modules.html test-app.html)"
     ],
     "deny": [],
     "ask": []

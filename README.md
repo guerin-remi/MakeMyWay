@@ -52,22 +52,29 @@ Le projet suit une architecture modulaire moderne avec séparation claire des re
         ├── main.js            # Point d'entrée principal
         ├── config.js          # Configuration centralisée
         └── modules/           # Modules spécialisés
-            ├── ApiService.js      # Gestion des APIs externes
-            ├── MapManager.js      # Gestion de la carte Leaflet
-            ├── UIManager.js       # Gestion de l'interface utilisateur
-            └── RouteGenerator.js  # Génération de parcours
+            ├── ApiService.js      # Gestion des APIs Google Maps
+            ├── AuthService.js     # Service d'authentification
+            ├── AuthUI.js          # Interface d'authentification
+            ├── MapManager.js      # Gestion de la carte Google Maps
+            ├── RouteGenerator.js  # Génération de parcours
+            ├── UIManager.js       # Orchestrateur interface utilisateur
+            └── ui/                # Composants d'interface spécialisés
+                ├── FormManager.js     # Gestion formulaires et autocomplétion
+                ├── POIManager.js      # Gestion points d'intérêt
+                ├── PanelManager.js    # Gestion panneaux flottants
+                └── ResultsManager.js  # Affichage résultats
 ```
 
 ### Modules Principaux
 
 #### 🔧 ApiService
-- Gestion des appels aux APIs OSRM et Nominatim
+- Gestion des appels aux APIs Google Maps
 - Cache intelligent pour optimiser les performances
-- Géocodage et géocodage inversé
-- Recherche de POI par catégorie
+- Géocodage et géocodage inversé via Geocoding API
+- Recherche de POI via Places API et calcul d'itinéraires via Directions API
 
 #### 🗺️ MapManager
-- Initialisation et gestion de la carte Leaflet
+- Initialisation et gestion de la carte Google Maps
 - Gestion des marqueurs interactifs (drag & drop)
 - Affichage des parcours avec couleurs par mode
 - Contrôles de carte personnalisés
@@ -79,10 +86,21 @@ Le projet suit une architecture modulaire moderne avec séparation claire des re
 - Intégration des POI dans les itinéraires
 
 #### 🎨 UIManager
-- Gestion de tous les éléments de l'interface
-- Autocomplétion pour adresses et POI
-- Gestion des événements utilisateur
-- Interface responsive avec support tactile
+- **Orchestrateur principal** de l'interface utilisateur
+- Coordination entre tous les composants UI
+- Gestion de l'état global de l'application
+- Délégation aux gestionnaires spécialisés (Form, POI, Panel, Results)
+
+#### 🔐 AuthService & AuthUI
+- **AuthService** : Authentification JWT, gestion session utilisateur
+- **AuthUI** : Composants d'interface de connexion et inscription
+- Intégration avec le backend pour l'authentification
+
+#### 🎛️ Composants UI Spécialisés
+- **FormManager** : Formulaires, autocomplétion Google Places, sliders
+- **POIManager** : Points d'intérêt, catégories, recherche personnalisée
+- **PanelManager** : Panneaux flottants, gestes tactiles mobiles
+- **ResultsManager** : Affichage statistiques et résultats de parcours
 
 #### ⚙️ Configuration
 - Centralisation de toutes les constantes
@@ -95,7 +113,8 @@ Le projet suit une architecture modulaire moderne avec séparation claire des re
 ### Prérequis
 - Un serveur web (local ou distant)
 - Navigateur moderne supportant les modules ES6
-- Connexion internet pour les APIs de cartographie
+- Connexion internet pour Google Maps API
+- Clé API Google Maps valide (optionnelle en développement)
 
 ### Lancement Local
 
@@ -165,17 +184,18 @@ Le projet est optimisé pour GitHub Pages :
 
 ### APIs Utilisées
 
-- **OSRM** (Open Source Routing Machine) : Calcul d'itinéraires
-- **Nominatim** : Géocodage et recherche d'adresses/POI
-- **OpenStreetMap** : Données cartographiques
+- **Google Maps JavaScript API** : Affichage et interaction avec la carte
+- **Google Maps Directions API** : Calcul d'itinéraires optimisés
+- **Google Maps Places API** : Recherche d'adresses et points d'intérêt
+- **Google Maps Geocoding API** : Conversion adresses/coordonnées
 
 ### Personnalisation
 
 Le fichier `assets/js/config.js` permet de personnaliser :
-- URLs des APIs
+- Configuration Google Maps (langue, pays par défaut)
 - Vitesses moyennes par mode de transport
 - Limites de distance
-- Paramètres d'optimisation
+- Paramètres d'optimisation des parcours
 - Messages d'interface
 
 ### Performance
@@ -227,9 +247,8 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ## 🙏 Remerciements
 
-- **OpenStreetMap** pour les données cartographiques ouvertes
-- **OSRM** pour l'API de routage performante
-- **Leaflet** pour la bibliothèque de cartographie
+- **Google Maps API** pour la plateforme cartographique complète (carte, routage, géolocalisation, recherche)
+- **OpenStreetMap** contributeurs pour les données cartographiques ouvertes
 - **Font Awesome** pour les icônes
 - **Inter Font** pour la typographie moderne
 

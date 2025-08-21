@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 
 /**
- * Gestionnaire de la carte Leaflet et des interactions cartographiques
+ * Gestionnaire de la carte Google Maps et des interactions cartographiques
  */
 export class MapManager {
     constructor(apiService) {
@@ -178,7 +178,7 @@ export class MapManager {
             }
         });
 
-        // InfoWindow d'aide (équivalent du popup Leaflet)
+        // InfoWindow d'aide (popup Google Maps)
         const infoWindow = new google.maps.InfoWindow({
             content: `
                 <div class="marker-popup">
@@ -257,7 +257,7 @@ export class MapManager {
             }
         });
 
-        // InfoWindow d'aide (équivalent du popup Leaflet)
+        // InfoWindow d'aide (popup Google Maps)
         const infoWindow = new google.maps.InfoWindow({
             content: `
                 <div class="marker-popup">

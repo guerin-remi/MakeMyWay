@@ -1,0 +1,36 @@
+# Fichiers de débogage et outils de développement
+debug/
+
+# Configuration locale
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# Node modules (backend)
+backend/node_modules/
+backend/package-lock.json
+
+# Cache
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+test-*.html
+test-*.js
+*.test.js

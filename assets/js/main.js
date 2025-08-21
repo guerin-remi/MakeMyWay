@@ -87,10 +87,8 @@ class MakeMyWayApp {
     _checkPrerequisites() {
         console.log('🔍 Vérification des prérequis...');
         
-        // Vérifier Leaflet
-        /*if (typeof L === 'undefined') {
-            throw new Error('Leaflet n\'est pas chargé. Vérifiez que la bibliothèque est incluse.');
-        }*/
+        // Vérifier Google Maps (sera chargé dynamiquement)
+        // Les APIs Google Maps seront vérifiées lors de l'initialisation des services
         
         // Vérifier le conteneur de carte
         const mapContainer = document.getElementById('map');

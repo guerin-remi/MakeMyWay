@@ -1,4 +1,8 @@
 import { CONFIG, ConfigUtils } from '../config.js';
+import { POIManager } from './ui/POIManager.js';
+import { PanelManager } from './ui/PanelManager.js';
+import { ResultsManager } from './ui/ResultsManager.js';
+import { FormManager } from './ui/FormManager.js';
 
 /**
  * Gestionnaire de l'interface utilisateur et des interactions DOM
@@ -15,13 +19,14 @@ export class UIManager {
             currentMode: 'walking',
             targetDistance: 5,
             returnToStart: false,
-            pois: [],
             isLoading: false
         };
-        this.suggestions = {
-            timeouts: new Map(),
-            containers: new Map()
-        };
+        
+        // Gestionnaires seront initialisés après le cache des éléments
+        this.poiManager = null;
+        this.panelManager = null;
+        this.resultsManager = null;
+        this.formManager = null;
     }
 
     /**
@@ -30,8 +35,9 @@ export class UIManager {
     async initialize() {
         try {
             this.cacheElements();
+            this.initializeManagers();
             this.setupEventListeners();
-            this.setupAutocomplete();
+            this.formManager.setupAutocomplete();
             this.initializeControls();
             this.setupResponsiveHandlers();
             
@@ -75,14 +81,60 @@ export class UIManager {
     }
 
     /**
+     * Initialise tous les gestionnaires
+     */
+    initializeManagers() {
+        // Gestionnaire POI
+        const poiElements = {
+            poiChips: this.elements.poiChips,
+            poiCategories: this.elements.poiCategories,
+            customPoi: this.elements.customPoi
+        };
+        this.poiManager = new POIManager(this.apiService, this.mapManager, poiElements);
+        
+        // Gestionnaire des panneaux
+        const panelElements = {
+            mainPanel: this.elements.mainPanel,
+            helpPanel: this.elements.helpPanel,
+            settingsBtn: this.elements.settingsBtn,
+            helpBtn: this.elements.helpBtn
+        };
+        this.panelManager = new PanelManager(panelElements);
+        
+        // Gestionnaire des résultats
+        const resultsElements = {
+            resultsPanel: this.elements.resultsPanel,
+            distanceResult: this.elements.distanceResult,
+            durationResult: this.elements.durationResult,
+            deviationResult: this.elements.deviationResult
+        };
+        this.resultsManager = new ResultsManager(resultsElements, this.routeGenerator);
+        
+        // Gestionnaire des formulaires
+        const formElements = {
+            startAddress: this.elements.startAddress,
+            endAddress: this.elements.endAddress,
+            returnToStart: this.elements.returnToStart,
+            targetDistance: this.elements.targetDistance,
+            distanceValue: this.elements.distanceValue,
+            maxLabel: this.elements.maxLabel,
+            travelModeInputs: this.elements.travelModeInputs,
+            startAddressSuggestions: this.elements.startAddressSuggestions,
+            endAddressSuggestions: this.elements.endAddressSuggestions,
+            poiSuggestions: this.elements.poiSuggestions
+        };
+        this.formManager = new FormManager(this.apiService, this, formElements);
+    }
+
+    /**
      * Configure tous les écouteurs d'événements
      */
     setupEventListeners() {
         // Boutons de navigation
-        this.addEventListenerSafe('settingsBtn', 'click', () => this.toggleMainPanel());
-        this.addEventListenerSafe('helpBtn', 'click', () => this.toggleHelpPanel());
-        this.addEventListenerSafe('closePanel', 'click', () => this.closeMainPanel());
-        this.addEventListenerSafe('closeHelp', 'click', () => this.closeHelpPanel());
+        this.addEventListenerSafe('settingsBtn', 'click', () => this.panelManager.toggleMainPanel());
+        this.addEventListenerSafe('helpBtn', 'click', () => this.panelManager.toggleHelpPanel());
+        this.addEventListenerSafe('closePanel', 'click', () => this.panelManager.closeMainPanel());
+        this.addEventListenerSafe('closeHelp', 'click', () => this.panelManager.closeHelpPanel());
 
         // Actions principales
         this.addEventListenerSafe('generateBtn', 'click', () => this.generateRoute());
@@ -93,26 +145,26 @@ export class UIManager {
         this.addEventListenerSafe('useLocationBtn', 'click', () => this.useCurrentLocation());
 
         // Contrôles de parcours
-        this.addEventListenerSafe('returnToStart', 'change', (e) => this.handleReturnToStartToggle(e.target.checked));
-        this.addEventListenerSafe('targetDistance', 'input', (e) => this.updateDistanceValue(e.target.value));
+        this.addEventListenerSafe('returnToStart', 'change', (e) => this.formManager.handleReturnToStartToggle(e.target.checked));
+        this.addEventListenerSafe('targetDistance', 'input', (e) => this.formManager.updateDistanceValue(e.target.value));
 
         // Modes de transport
         if (this.elements.travelModeInputs) {
             this.elements.travelModeInputs.forEach(input => {
-                input.addEventListener('change', (e) => this.handleModeChange(e.target.value));
+                input.addEventListener('change', (e) => this.formManager.handleModeChange(e.target.value));
             });
         }
 
         // POI
-        this.addEventListenerSafe('addPoiBtn', 'click', () => this.addCustomPOI());
+        this.addEventListenerSafe('addPoiBtn', 'click', () => this.handleAddCustomPOI());
         this.addEventListenerSafe('customPoi', 'keypress', (e) => {
-            if (e.key === 'Enter') this.addCustomPOI();
+            if (e.key === 'Enter') this.handleAddCustomPOI();
         });
 
         // Catégories POI
         if (this.elements.poiCategories) {
             this.elements.poiCategories.forEach(category => {
-                category.addEventListener('click', () => this.togglePOICategory(category));
+                category.addEventListener('click', () => this.handleTogglePOICategory(category));
             });
         }
 
@@ -123,7 +175,7 @@ export class UIManager {
         this.addEventListenerSafe('fullscreenBtn', 'click', () => this.mapManager.toggleFullscreen());
 
         // Résultats
-        this.addEventListenerSafe('closeResults', 'click', () => this.hideResults());
+        this.addEventListenerSafe('closeResults', 'click', () => this.resultsManager.hideResults());
 
         // Événements globaux
         this.setupGlobalEventListeners();
@@ -133,432 +185,45 @@ export class UIManager {
      * Configure les écouteurs d'événements globaux
      */
     setupGlobalEventListeners() {
-        // Fermeture avec Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeAllPanels();
-            }
-        });
-
-        // Fermeture des panneaux en cliquant à l'extérieur (mobile)
-        document.addEventListener('click', (e) => {
-            if (window.innerWidth <= CONFIG.UI.BREAKPOINTS.MOBILE) {
-                if (!this.elements.mainPanel?.contains(e.target) && 
-                    !this.elements.settingsBtn?.contains(e.target) &&
-                    !this.elements.mainPanel?.classList.contains('collapsed')) {
-                    this.closeMainPanel();
-                }
-            }
-        });
-    }
-
-    /**
-     * Configure la saisie automatique pour les adresses avec Google Places Autocomplete
-     */
-    setupAutocomplete() {
-        // Vérifier que Google Maps est disponible
-        if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-            console.warn('⚠️ Google Places API non disponible, autocomplétion désactivée');
-            return;
-        }
-
-        try {
-            // Configuration pour les autocompletes (privilégier les adresses)
-            const autocompleteOptions = {
-                types: ['address'],
-                componentRestrictions: { country: 'fr' }, // Limiter à la France (optionnel)
-                fields: ['place_id', 'geometry', 'name', 'formatted_address']
-            };
-
-            // Configurer l'autocomplétion pour le point de départ
-            this.setupStartAddressAutocomplete(autocompleteOptions);
-
-            // Configurer l'autocomplétion pour le point d'arrivée  
-            this.setupEndAddressAutocomplete(autocompleteOptions);
-
-            console.log('✅ Autocomplétion Google Places configurée');
-
-        } catch (error) {
-            console.error('Erreur configuration Google Places Autocomplete:', error);
+        // Déléguer la gestion des panneaux
+        if (this.panelManager) {
+            this.panelManager.setupGlobalEventListeners();
         }
     }
 
-    /**
-     * Configure l'autocomplétion Google Places pour le point de départ
-     * @param {Object} options - Options de configuration
-     */
-    setupStartAddressAutocomplete(options) {
-        const input = this.elements.startAddress;
-        if (!input) {
-            console.warn('⚠️ Champ startAddress non trouvé');
-            return;
-        }
 
-        // Créer l'instance d'autocomplétion
-        const autocomplete = new google.maps.places.Autocomplete(input, options);
 
-        // Écouter l'événement place_changed
-        autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace();
-
-            // Vérifier que le lieu a une géométrie (coordonnées)
-            if (!place.geometry || !place.geometry.location) {
-                console.warn('⚠️ Lieu sélectionné sans coordonnées:', place.name);
-                return;
-            }
-
-            // Extraire les coordonnées
-            const location = place.geometry.location;
-            const coordinates = {
-                lat: location.lat(),
-                lng: location.lng()
-            };
-
-            // Mettre à jour le point de départ
-            this.setStartPoint(coordinates);
-
-            console.log('📍 Point de départ défini via Google Places:', place.formatted_address);
-        });
-
-        // Stocker la référence pour un éventuel nettoyage
-        this.autocompletes = this.autocompletes || {};
-        this.autocompletes.start = autocomplete;
-    }
-
-    /**
-     * Configure l'autocomplétion Google Places pour le point d'arrivée
-     * @param {Object} options - Options de configuration
-     */
-    setupEndAddressAutocomplete(options) {
-        const input = this.elements.endAddress;
-        if (!input) {
-            console.warn('⚠️ Champ endAddress non trouvé');
-            return;
-        }
-
-        // Créer l'instance d'autocomplétion
-        const autocomplete = new google.maps.places.Autocomplete(input, options);
-
-        // Écouter l'événement place_changed
-        autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace();
-
-            // Vérifier que le lieu a une géométrie (coordonnées)
-            if (!place.geometry || !place.geometry.location) {
-                console.warn('⚠️ Lieu sélectionné sans coordonnées:', place.name);
-                return;
-            }
-
-            // Extraire les coordonnées
-            const location = place.geometry.location;
-            const coordinates = {
-                lat: location.lat(),
-                lng: location.lng()
-            };
-
-            // Mettre à jour le point d'arrivée
-            this.setEndPoint(coordinates);
-
-            console.log('🏁 Point d\'arrivée défini via Google Places:', place.formatted_address);
-        });
-
-        // Stocker la référence pour un éventuel nettoyage
-        this.autocompletes = this.autocompletes || {};
-        this.autocompletes.end = autocomplete;
-    }
-
-    /**
-     * Configure l'autocomplétion pour un champ d'adresse
-     * @param {string} inputId - ID du champ de saisie
-     * @param {string} suggestionsId - ID du conteneur de suggestions
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    setupAddressAutocomplete(inputId, suggestionsId, type) {
-        const input = this.elements[inputId];
-        const suggestionsContainer = this.elements[suggestionsId];
-        
-        if (!input) return;
-
-        input.addEventListener('input', async (e) => {
-            const query = e.target.value.trim();
-            
-            // Annuler la recherche précédente
-            this.cancelSuggestionTimeout(inputId);
-            
-            if (query.length < 3) {
-                this.hideSuggestions(suggestionsContainer);
-                return;
-            }
-
-            // Délai pour éviter trop de requêtes
-            const timeoutId = setTimeout(async () => {
-                try {
-                    const suggestions = await this.apiService.searchAddresses(query);
-                    this.showAddressSuggestions(suggestions, suggestionsContainer, input, type);
-                } catch (error) {
-                    console.error('Erreur recherche adresses:', error);
-                    this.hideSuggestions(suggestionsContainer);
-                }
-            }, CONFIG.POI.SEARCH_DELAY);
-
-            this.suggestions.timeouts.set(inputId, timeoutId);
-        });
-
-        // Masquer les suggestions lors de la perte de focus
-        input.addEventListener('blur', () => {
-            setTimeout(() => this.hideSuggestions(suggestionsContainer), CONFIG.UI.SUGGESTION_DELAY);
-        });
-
-        input.addEventListener('focus', () => {
-            if (input.value.length >= 3 && suggestionsContainer?.children.length > 0) {
-                suggestionsContainer.style.display = 'block';
-            }
-        });
-    }
-
-    /**
-     * Configure l'autocomplétion pour les POI
-     * @param {string} inputId - ID du champ de saisie POI
-     * @param {string} suggestionsId - ID du conteneur de suggestions POI
-     */
-    setupPOIAutocomplete(inputId, suggestionsId) {
-        const input = this.elements[inputId];
-        const suggestionsContainer = this.elements[suggestionsId];
-        
-        if (!input) return;
-
-        input.addEventListener('input', async (e) => {
-            const query = e.target.value.trim();
-            
-            this.cancelSuggestionTimeout(inputId);
-            
-            if (query.length < CONFIG.POI.MIN_QUERY_LENGTH) {
-                this.hideSuggestions(suggestionsContainer);
-                return;
-            }
-
-            const timeoutId = setTimeout(async () => {
-                try {
-                    const searchCenter = this.state.startPoint || this.mapManager.getMapCenter();
-                    const suggestions = await this.apiService.searchPOIs(query, searchCenter);
-                    this.showPOISuggestions(suggestions, suggestionsContainer, input);
-                } catch (error) {
-                    console.error('Erreur recherche POI:', error);
-                    this.hideSuggestions(suggestionsContainer);
-                }
-            }, CONFIG.POI.SEARCH_DELAY);
-
-            this.suggestions.timeouts.set(inputId, timeoutId);
-        });
-
-        input.addEventListener('blur', () => {
-            setTimeout(() => this.hideSuggestions(suggestionsContainer), CONFIG.UI.SUGGESTION_DELAY);
-        });
-    }
 
     /**
      * Initialise l'état des contrôles
      */
     initializeControls() {
         // Initialiser les limites du slider selon le mode par défaut
-        this.updateDistanceLimits(this.state.currentMode);
+        this.formManager.updateDistanceLimits(this.state.currentMode);
         
         // Initialiser l'état du toggle "Retour au départ"
-        this.handleReturnToStartToggle(false);
+        this.formManager.handleReturnToStartToggle(false);
         
         // Mettre à jour l'affichage de la distance
-        this.updateDistanceValue(this.state.targetDistance);
+        this.formManager.updateDistanceValue(this.state.targetDistance);
     }
 
     /**
      * Configure les gestionnaires responsive
      */
     setupResponsiveHandlers() {
-        // Support tactile pour le glissement du panneau (mobile)
-        if (window.innerWidth <= CONFIG.UI.BREAKPOINTS.MOBILE) {
-            this.setupMobilePanelGestures();
+        // Déléguer la gestion responsive des panneaux
+        if (this.panelManager) {
+            this.panelManager.setupResponsiveHandlers();
         }
 
-        // Redimensionnement de fenêtre
+        // Redimensionnement de fenêtre pour la carte
         window.addEventListener('resize', () => {
             this.mapManager.invalidateSize();
-            
-            // Réinitialiser les gestes mobiles si nécessaire
-            if (window.innerWidth <= CONFIG.UI.BREAKPOINTS.MOBILE) {
-                this.setupMobilePanelGestures();
-            }
         });
     }
 
-    /**
-     * Configure les gestes tactiles pour le panneau mobile
-     */
-    setupMobilePanelGestures() {
-        const panel = this.elements.mainPanel;
-        const panelHandle = panel?.querySelector('.panel-handle');
-        const panelHeader = panel?.querySelector('.panel-header');
-        
-        if (!panel) return;
 
-        let startY = 0;
-        let currentY = 0;
-        let isDragging = false;
-
-        const elements = [panelHandle, panelHeader].filter(Boolean);
-        
-        elements.forEach(element => {
-            element.addEventListener('touchstart', (e) => {
-                startY = e.touches[0].clientY;
-                isDragging = true;
-                panel.style.transition = 'none';
-            });
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            
-            currentY = e.touches[0].clientY;
-            const deltaY = currentY - startY;
-            
-            if (deltaY > 0) {
-                panel.style.transform = `translateY(${deltaY}px)`;
-            }
-        });
-
-        document.addEventListener('touchend', () => {
-            if (!isDragging) return;
-            
-            const deltaY = currentY - startY;
-            panel.style.transition = 'transform 0.3s ease-out';
-            
-            if (deltaY > 100) {
-                this.closeMainPanel();
-            } else {
-                panel.style.transform = 'translateY(0)';
-            }
-            
-            isDragging = false;
-            startY = 0;
-            currentY = 0;
-        });
-    }
-
-    /**
-     * Affiche les suggestions d'adresses
-     * @param {Array} suggestions - Liste des suggestions
-     * @param {HTMLElement} container - Conteneur des suggestions
-     * @param {HTMLInputElement} input - Champ de saisie
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    showAddressSuggestions(suggestions, container, input, type) {
-        if (!container) return;
-
-        container.innerHTML = '';
-        container.style.display = 'none';
-
-        if (suggestions.length === 0) {
-            const noResults = document.createElement('div');
-            noResults.className = 'suggestion-item';
-            noResults.textContent = 'Aucune adresse trouvée';
-            noResults.style.color = '#64748B';
-            container.appendChild(noResults);
-            container.style.display = 'block';
-            return;
-        }
-
-        suggestions.forEach(suggestion => {
-            const item = document.createElement('div');
-            item.className = 'suggestion-item';
-            item.innerHTML = `
-                <div style="font-weight: 500;">${this.apiService.formatAddressName(suggestion.display_name)}</div>
-                <div style="font-size: 0.8rem; color: #64748B; margin-top: 0.25rem;">
-                    ${this.apiService.getAddressDetails(suggestion.display_name)}
-                </div>
-            `;
-            
-            item.addEventListener('click', () => {
-                this.selectAddress(suggestion, input, type);
-                this.hideSuggestions(container);
-            });
-            
-            container.appendChild(item);
-        });
-
-        container.style.display = 'block';
-    }
-
-    /**
-     * Affiche les suggestions de POI
-     * @param {Array} suggestions - Liste des suggestions POI
-     * @param {HTMLElement} container - Conteneur des suggestions
-     * @param {HTMLInputElement} input - Champ de saisie
-     */
-    showPOISuggestions(suggestions, container, input) {
-        if (!container) return;
-
-        container.innerHTML = '';
-        container.style.display = 'none';
-
-        if (suggestions.length === 0) {
-            const noResults = document.createElement('div');
-            noResults.className = 'suggestion-item';
-            noResults.textContent = 'Aucun POI trouvé';
-            noResults.style.color = '#64748B';
-            container.appendChild(noResults);
-            container.style.display = 'block';
-            return;
-        }
-
-        suggestions.forEach(suggestion => {
-            const item = document.createElement('div');
-            item.className = 'suggestion-item';
-            item.innerHTML = `
-                <div style="font-weight: 500;">${suggestion.name}</div>
-                <div style="font-size: 0.8rem; color: #64748B; margin-top: 0.25rem;">
-                    ${this.apiService.getPOITypeIcon(suggestion.type)} ${this.apiService.formatPOIType(suggestion.type, suggestion.class)}
-                </div>
-            `;
-            
-            item.addEventListener('click', () => {
-                this.selectPOI(suggestion, input);
-                this.hideSuggestions(container);
-            });
-            
-            container.appendChild(item);
-        });
-
-        container.style.display = 'block';
-    }
-
-    /**
-     * Sélectionne une adresse depuis les suggestions
-     * @param {Object} suggestion - Suggestion d'adresse
-     * @param {HTMLInputElement} input - Champ de saisie
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    selectAddress(suggestion, input, type) {
-        input.value = this.apiService.formatAddressName(suggestion.display_name);
-        
-        const latlng = { lat: suggestion.lat, lng: suggestion.lng };
-        
-        if (type === 'start') {
-            this.setStartPoint(latlng);
-        } else if (type === 'end') {
-            this.setEndPoint(latlng);
-        }
-        
-        console.log(`✅ ${type === 'start' ? 'Départ' : 'Arrivée'} défini:`, suggestion.display_name);
-    }
-
-    /**
-     * Sélectionne un POI depuis les suggestions
-     * @param {Object} poi - POI sélectionné
-     * @param {HTMLInputElement} input - Champ de saisie
-     */
-    selectPOI(poi, input) {
-        input.value = poi.name;
-        this.addPOIToList(poi);
-    }
 
     /**
      * Ajoute un écouteur d'événement de manière sécurisée
@@ -629,275 +294,52 @@ export class UIManager {
         console.log('ℹ️ Informations de parcours mises à jour');
     }
 
-    /**
-     * Gère le changement du toggle "Retour au départ"
-     * @param {boolean} isChecked - État du toggle
-     */
-    handleReturnToStartToggle(isChecked) {
-        this.state.returnToStart = isChecked;
-        
-        const endAddressGroup = this.elements.endAddress?.closest('.route-input-group');
-        
-        if (isChecked) {
-            // Masquer et désactiver le champ d'arrivée
-            if (endAddressGroup) {
-                endAddressGroup.style.opacity = '0.5';
-                endAddressGroup.style.pointerEvents = 'none';
-            }
-            
-            // Supprimer le marqueur d'arrivée
-            if (this.state.endPoint) {
-                this.mapManager.removeEndMarker();
-                this.state.endPoint = null;
-            }
-            
-            // Vider et désactiver le champ
-            if (this.elements.endAddress) {
-                this.elements.endAddress.value = '';
-                this.elements.endAddress.placeholder = 'Retour au départ activé';
-            }
-        } else {
-            // Réactiver le champ d'arrivée
-            if (endAddressGroup) {
-                endAddressGroup.style.opacity = '1';
-                endAddressGroup.style.pointerEvents = 'auto';
-            }
-            
-            if (this.elements.endAddress) {
-                this.elements.endAddress.placeholder = 'Point d\'arrivée (optionnel)';
-            }
-        }
-        
-        this.updateRouteInfo();
-    }
 
     /**
-     * Gère le changement de mode de transport
-     * @param {string} mode - Nouveau mode ('walking', 'running', 'cycling')
-     */
-    handleModeChange(mode) {
-        this.state.currentMode = mode;
-        this.updateDistanceLimits(mode);
-        console.log(`Mode de transport: ${mode}`);
-    }
-
-    /**
-     * Met à jour les limites du slider de distance selon le mode
-     * @param {string} mode - Mode de transport
-     */
-    updateDistanceLimits(mode) {
-        const slider = this.elements.targetDistance;
-        const maxLabel = this.elements.maxLabel;
-        const distanceValue = this.elements.distanceValue;
-        
-        if (!slider || !maxLabel) return;
-
-        const limits = ConfigUtils.getModeConfig(mode).limits;
-        const newMax = limits.max;
-        
-        // Ajuster la valeur actuelle si elle dépasse le nouveau maximum
-        if (parseFloat(slider.value) > newMax) {
-            slider.value = limits.default;
-            this.state.targetDistance = limits.default;
-            if (distanceValue) {
-                distanceValue.textContent = `${limits.default} km`;
-            }
-        }
-        
-        slider.max = newMax;
-        maxLabel.textContent = `${newMax}km`;
-        
-        console.log(`Distance max ajustée: ${newMax}km pour le mode ${mode}`);
-    }
-
-    /**
-     * Met à jour l'affichage de la valeur de distance
-     * @param {number} value - Nouvelle valeur de distance
-     */
-    updateDistanceValue(value) {
-        this.state.targetDistance = parseFloat(value);
-        
-        if (this.elements.distanceValue) {
-            this.elements.distanceValue.textContent = `${value} km`;
-        }
-    }
-
-    /**
-     * Active/désactive une catégorie POI
+     * Gère le toggle d'une catégorie POI
      * @param {HTMLElement} categoryElement - Élément de catégorie cliqué
      */
-    async togglePOICategory(categoryElement) {
-        const category = categoryElement.dataset.preset;
-        if (!category) return;
-
-        const isActive = categoryElement.classList.contains('active');
-        
-        if (isActive) {
-            // Désactiver la catégorie
-            categoryElement.classList.remove('active');
-            this.removePOIsByCategory(category);
-        } else {
-            // Vérifier qu'un point de départ est défini
-            if (!this.state.startPoint) {
-                this.showError('Veuillez d\'abord définir un point de départ');
-                return;
-            }
-            
-            // Activer la catégorie
-            categoryElement.classList.add('active');
-            await this.addPOIsByCategory(category);
-        }
-    }
-
-    /**
-     * Ajoute des POI par catégorie
-     * @param {string} category - Catégorie de POI
-     */
-    async addPOIsByCategory(category) {
+    async handleTogglePOICategory(categoryElement) {
         try {
             this.showLoading(CONFIG.MESSAGES.INFO.SEARCHING);
             
-            const pois = await this.apiService.searchPOIsByCategory(category, this.state.startPoint);
-            
-            pois.forEach(poi => this.addPOIToList(poi));
-            
-            if (pois.length === 0) {
-                this.showError(`Aucun POI ${CONFIG.POI.CATEGORIES[category]?.name || category} trouvé dans cette zone`);
-            } else {
-                console.log(`✅ ${pois.length} POI ${category} ajoutés`);
-            }
+            await this.poiManager.togglePOICategory(categoryElement, this.state.startPoint);
             
         } catch (error) {
-            console.error(`Erreur ajout POI ${category}:`, error);
-            this.showError(`Erreur lors de la recherche de POI ${CONFIG.POI.CATEGORIES[category]?.name || category}`);
+            console.error('Erreur toggle POI:', error);
+            this.showError(error.message);
+            
+            // Annuler l'activation en cas d'erreur
+            categoryElement.classList.remove('active');
+            
         } finally {
             this.hideLoading();
         }
     }
 
     /**
-     * Supprime les POI d'une catégorie
-     * @param {string} category - Catégorie à supprimer
+     * Gère l'ajout d'un POI personnalisé
      */
-    removePOIsByCategory(category) {
-        const poisToRemove = this.state.pois.filter(poi => poi.category === category);
-        
-        poisToRemove.forEach(poi => {
-            const index = this.state.pois.indexOf(poi);
-            if (index > -1) {
-                this.removePOI(index);
-            }
-        });
-        
-        console.log(`🗑️ POI ${category} supprimés`);
-    }
-
-    /**
-     * Ajoute un POI personnalisé
-     */
-    async addCustomPOI() {
+    async handleAddCustomPOI() {
         const input = this.elements.customPoi;
         if (!input) return;
 
         const query = input.value.trim();
-        if (query.length < 2) {
-            this.showError(CONFIG.MESSAGES.ERRORS.INVALID_QUERY);
-            return;
-        }
 
         try {
             this.showLoading(CONFIG.MESSAGES.INFO.SEARCHING);
             
             const searchCenter = this.state.startPoint || this.mapManager.getMapCenter();
             
-            // Recherche avec Google Places
-            const pois = await this.apiService.searchCustomPOI(query, searchCenter, 5);
-            
-            if (pois.length > 0) {
-                const poi = pois[0];
-                this.addPOIToList(poi);
-                input.value = '';
-                console.log(`✅ POI personnalisé ajouté: ${poi.name}`);
-            } else {
-                this.showError('Aucun lieu trouvé pour cette recherche');
-            }
+            const poi = await this.poiManager.addCustomPOI(query, searchCenter);
+            input.value = '';
             
         } catch (error) {
-            console.error('Erreur ajout POI:', error);
-            this.showError('Erreur lors de l\'ajout du POI');
+            console.error('Erreur ajout POI personnalisé:', error);
+            this.showError(error.message);
+            
         } finally {
             this.hideLoading();
-        }
-    }
-
-    /**
-     * Ajoute un POI à la liste
-     * @param {Object} poi - POI à ajouter
-     */
-    addPOIToList(poi) {
-        // Éviter les doublons
-        const exists = this.state.pois.find(p => 
-            Math.abs(p.lat - poi.lat) < 0.001 && Math.abs(p.lng - poi.lng) < 0.001
-        );
-        
-        if (exists) {
-            this.showError('Ce POI est déjà dans votre liste');
-            return;
-        }
-        
-        // Ajouter à la liste
-        this.state.pois.push(poi);
-        this.updatePOIChips();
-        
-        // Ajouter le marqueur sur la carte
-        poi._marker = this.mapManager.addPOIMarker(poi);
-        
-        console.log(`✅ POI ajouté: ${poi.name}`);
-    }
-
-    /**
-     * Met à jour l'affichage des chips POI
-     */
-    updatePOIChips() {
-        const container = this.elements.poiChips;
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        this.state.pois.forEach((poi, index) => {
-            const chip = document.createElement('div');
-            chip.className = 'poi-chip';
-            chip.innerHTML = `
-                <span>${this.apiService.getPOITypeIcon(poi.type)} ${poi.name}</span>
-                <button class="chip-remove" data-index="${index}" title="Supprimer">×</button>
-            `;
-            
-            // Événement de suppression
-            const removeBtn = chip.querySelector('.chip-remove');
-            removeBtn.addEventListener('click', () => this.removePOI(index));
-            
-            container.appendChild(chip);
-        });
-    }
-
-    /**
-     * Supprime un POI de la liste
-     * @param {number} index - Index du POI à supprimer
-     */
-    removePOI(index) {
-        if (index >= 0 && index < this.state.pois.length) {
-            const poi = this.state.pois[index];
-            
-            // Supprimer de la carte
-            if (poi._marker) {
-                this.mapManager.removePOIMarker(poi._marker);
-            }
-            
-            // Supprimer de la liste
-            this.state.pois.splice(index, 1);
-            this.updatePOIChips();
-            
-            console.log(`🗑️ POI supprimé: ${poi.name}`);
         }
     }
 
@@ -950,7 +392,7 @@ export class UIManager {
             const options = {
                 endPoint: this.state.endPoint,
                 returnToStart: this.state.returnToStart,
-                pois: this.state.pois
+                pois: this.poiManager ? this.poiManager.getPOIs() : []
             };
 
             // Générer le parcours
@@ -965,11 +407,11 @@ export class UIManager {
             this.mapManager.displayRoute(routeData.route, this.state.currentMode);
 
             // Afficher les résultats
-            this.showResults(routeData);
+            this.resultsManager.showResults(routeData);
 
             // Fermer automatiquement le panneau sur mobile
             if (window.innerWidth <= CONFIG.UI.BREAKPOINTS.MOBILE) {
-                setTimeout(() => this.closeMainPanel(), 500);
+                setTimeout(() => this.panelManager.closeMainPanel(), 500);
             }
 
             console.log('✅ Parcours généré et affiché');
@@ -1066,7 +508,6 @@ export class UIManager {
         // Reset de l'état
         this.state.startPoint = null;
         this.state.endPoint = null;
-        this.state.pois = [];
         
         // Reset de la carte
         this.mapManager.reset();
@@ -1074,8 +515,13 @@ export class UIManager {
         // Reset de l'interface
         this.resetInterface();
         
+        // Reset des formulaires
+        if (this.formManager) {
+            this.formManager.reset();
+        }
+        
         // Masquer les résultats
-        this.hideResults();
+        this.resultsManager.hideResults();
         
         console.log('✅ Application remise à zéro');
     }
@@ -1091,98 +537,18 @@ export class UIManager {
             }
         });
 
-        // Masquer les suggestions
-        Object.values(this.suggestions.containers).forEach(container => {
-            this.hideSuggestions(container);
-        });
 
         // Reset des POI
-        this.updatePOIChips();
-        
-        // Désactiver toutes les catégories POI
-        if (this.elements.poiCategories) {
-            this.elements.poiCategories.forEach(category => {
-                category.classList.remove('active');
-            });
+        if (this.poiManager) {
+            this.poiManager.reset();
         }
 
-        // Reset du toggle retour au départ
+        // Reset du toggle retour au départ (géré par FormManager)
         if (this.elements.returnToStart) {
             this.elements.returnToStart.checked = false;
-            this.handleReturnToStartToggle(false);
         }
     }
 
-    /**
-     * Affiche les résultats du parcours
-     * @param {Object} routeData - Données du parcours
-     */
-    showResults(routeData) {
-        if (!this.elements.resultsPanel) return;
-
-        const metadata = this.routeGenerator.getLastRouteMetadata();
-        if (!metadata) return;
-
-        // Calculer les statistiques
-        const actualDistance = routeData.distance;
-        const estimatedDuration = routeData.duration;
-        const deviation = Math.abs(actualDistance - metadata.targetDistance);
-        
-        // Mettre à jour les éléments de résultat
-        if (this.elements.distanceResult) {
-            this.elements.distanceResult.textContent = `${actualDistance.toFixed(1)} km`;
-        }
-        
-        if (this.elements.durationResult) {
-            this.elements.durationResult.textContent = this.formatDuration(estimatedDuration);
-        }
-        
-        if (this.elements.deviationResult) {
-            const deviationPercent = (deviation / metadata.targetDistance) * 100;
-            
-            if (deviationPercent <= 5) {
-                this.elements.deviationResult.textContent = '✓ Parfait';
-                this.elements.deviationResult.style.color = 'var(--success)';
-            } else if (deviationPercent <= 15) {
-                this.elements.deviationResult.textContent = `±${deviation.toFixed(1)}km`;
-                this.elements.deviationResult.style.color = 'var(--warning)';
-            } else {
-                this.elements.deviationResult.textContent = `±${deviation.toFixed(1)}km`;
-                this.elements.deviationResult.style.color = 'var(--error)';
-            }
-        }
-
-        // Afficher le panneau avec animation
-        setTimeout(() => {
-            this.elements.resultsPanel.classList.add('show');
-        }, 500);
-
-        console.log(`📊 Résultats: ${actualDistance.toFixed(1)}km en ${this.formatDuration(estimatedDuration)}`);
-    }
-
-    /**
-     * Masque les résultats
-     */
-    hideResults() {
-        if (this.elements.resultsPanel) {
-            this.elements.resultsPanel.classList.remove('show');
-        }
-    }
-
-    /**
-     * Formate une durée en format lisible
-     * @param {number} minutes - Durée en minutes
-     * @returns {string} Durée formatée
-     */
-    formatDuration(minutes) {
-        if (minutes < 60) {
-            return `${Math.round(minutes)}min`;
-        } else {
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = Math.round(minutes % 60);
-            return remainingMinutes > 0 ? `${hours}h${remainingMinutes.toString().padStart(2, '0')}` : `${hours}h`;
-        }
-    }
 
     /**
      * Affiche l'overlay de chargement
@@ -1219,74 +585,7 @@ export class UIManager {
         console.error('Erreur UI:', message);
     }
 
-    /**
-     * Toggle du panneau principal
-     */
-    toggleMainPanel() {
-        if (this.elements.mainPanel && this.elements.settingsBtn) {
-            this.elements.settingsBtn.classList.toggle('active');
-            this.elements.mainPanel.classList.toggle('collapsed');
-        }
-    }
 
-    /**
-     * Ferme le panneau principal
-     */
-    closeMainPanel() {
-        if (this.elements.mainPanel && this.elements.settingsBtn) {
-            this.elements.settingsBtn.classList.remove('active');
-            this.elements.mainPanel.classList.add('collapsed');
-        }
-    }
-
-    /**
-     * Toggle du panneau d'aide
-     */
-    toggleHelpPanel() {
-        if (this.elements.helpPanel && this.elements.helpBtn) {
-            this.elements.helpBtn.classList.toggle('active');
-            this.elements.helpPanel.classList.toggle('show');
-        }
-    }
-
-    /**
-     * Ferme le panneau d'aide
-     */
-    closeHelpPanel() {
-        if (this.elements.helpPanel && this.elements.helpBtn) {
-            this.elements.helpBtn.classList.remove('active');
-            this.elements.helpPanel.classList.remove('show');
-        }
-    }
-
-    /**
-     * Ferme tous les panneaux
-     */
-    closeAllPanels() {
-        this.closeMainPanel();
-        this.closeHelpPanel();
-    }
-
-    /**
-     * Masque un conteneur de suggestions
-     * @param {HTMLElement} container - Conteneur à masquer
-     */
-    hideSuggestions(container) {
-        if (container) {
-            container.style.display = 'none';
-        }
-    }
-
-    /**
-     * Annule le timeout de suggestion pour un champ
-     * @param {string} inputId - ID du champ de saisie
-     */
-    cancelSuggestionTimeout(inputId) {
-        if (this.suggestions.timeouts.has(inputId)) {
-            clearTimeout(this.suggestions.timeouts.get(inputId));
-            this.suggestions.timeouts.delete(inputId);
-        }
-    }
 
     /**
      * Obtient l'état actuel de l'interface
