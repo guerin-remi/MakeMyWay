@@ -27,6 +27,12 @@ export class AuthUI {
         this.userName = document.getElementById('userName');
         this.userEmail = document.getElementById('userEmail');
         
+        // Modale de gestion du compte
+        this.accountModal = document.getElementById('accountModal');
+        this.accountForm = document.getElementById('accountForm');
+        this.closeAccount = document.getElementById('closeAccount');
+        this.cancelAccount = document.getElementById('cancelAccount');
+        
         // Formulaires
         this.loginForm = document.getElementById('loginForm');
         this.registerForm = document.getElementById('registerForm');
@@ -37,6 +43,12 @@ export class AuthUI {
         this.showRegister = document.getElementById('showRegister');
         this.showLogin = document.getElementById('showLogin');
         this.logoutBtn = document.getElementById('logoutBtn');
+        this.manageAccountBtn = document.getElementById('manageAccountBtn');
+        
+        console.log('🔧 Debug AuthUI elements:', {
+            manageAccountBtn: !!this.manageAccountBtn,
+            accountModal: !!document.getElementById('accountModal')
+        });
     }
 
     /**
@@ -61,8 +73,25 @@ export class AuthUI {
         this.loginForm?.addEventListener('submit', (e) => this.handleLogin(e));
         this.registerForm?.addEventListener('submit', (e) => this.handleRegister(e));
         
-        // Déconnexion
+        // Déconnexion et gestion du compte
         this.logoutBtn?.addEventListener('click', () => this.handleLogout());
+        
+        // Gérer le bouton "Mon compte" avec délégation d'événements
+        document.addEventListener('click', (e) => {
+            // Vérifier si c'est le bouton ou un élément à l'intérieur
+            const manageBtn = e.target.closest('#manageAccountBtn');
+            if (manageBtn) {
+                console.log('🔧 Clic sur Mon compte détecté (délégation)');
+                this.showAccountModal();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+        
+        // Modale de gestion du compte
+        this.closeAccount?.addEventListener('click', () => this.hideAccountModal());
+        this.cancelAccount?.addEventListener('click', () => this.hideAccountModal());
+        this.accountForm?.addEventListener('submit', (e) => this.handleAccountUpdate(e));
 
         // Fermeture des modales en cliquant sur l'overlay
         this.loginModal?.addEventListener('click', (e) => {
@@ -70,6 +99,9 @@ export class AuthUI {
         });
         this.registerModal?.addEventListener('click', (e) => {
             if (e.target === this.registerModal) this.hideRegisterModal();
+        });
+        this.accountModal?.addEventListener('click', (e) => {
+            if (e.target === this.accountModal) this.hideAccountModal();
         });
 
         // Fermeture du menu utilisateur en cliquant ailleurs
@@ -86,6 +118,16 @@ export class AuthUI {
                 this.hideUserMenu();
             }
         });
+        
+        // Gestion des onglets
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-btn')) {
+                this.handleTabSwitch(e.target);
+            }
+        });
+        
+        // Boutons de la modale de compte
+        document.getElementById('deleteAccount')?.addEventListener('click', () => this.handleDeleteAccount());
     }
 
     /**
@@ -276,6 +318,189 @@ export class AuthUI {
     hideAllModals() {
         this.hideLoginModal();
         this.hideRegisterModal();
+        this.hideAccountModal();
+    }
+    
+    /**
+     * Affiche la modale de gestion du compte
+     */
+    showAccountModal() {
+        console.log('🔧 showAccountModal() appelée', { accountModal: !!this.accountModal });
+        this.hideAllModals();
+        this.hideUserMenu();
+        if (this.accountModal) {
+            this.accountModal.classList.add('active');
+            console.log('🔧 Classe active ajoutée à la modale');
+        } else {
+            console.error('❌ accountModal introuvable !');
+        }
+        this.populateAccountForm();
+    }
+    
+    /**
+     * Cache la modale de gestion du compte
+     */
+    hideAccountModal() {
+        this.accountModal?.classList.remove('active');
+        this.resetAccountForm();
+    }
+    
+    /**
+     * Remplit le formulaire de gestion du compte
+     */
+    populateAccountForm() {
+        const user = this.authService.getCurrentUser();
+        if (user) {
+            document.getElementById('accountName').value = user.name || '';
+            document.getElementById('accountEmail').value = user.email || '';
+            
+            // Date de création (si disponible)
+            if (user.createdAt) {
+                const date = new Date(user.createdAt).toLocaleDateString('fr-FR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                document.getElementById('accountCreated').value = date;
+            }
+        }
+    }
+    
+    /**
+     * Gère le changement d'onglet
+     */
+    handleTabSwitch(tabBtn) {
+        // Retirer la classe active de tous les onglets et contenus
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // Activer l'onglet cliqué
+        tabBtn.classList.add('active');
+        
+        // Activer le contenu correspondant
+        const tabId = tabBtn.dataset.tab;
+        const tabContent = document.getElementById(tabId + 'Tab');
+        if (tabContent) {
+            tabContent.classList.add('active');
+        }
+    }
+    
+    /**
+     * Gère la mise à jour du compte
+     */
+    async handleAccountUpdate(e) {
+        e.preventDefault();
+        
+        const currentTab = document.querySelector('.tab-btn.active').dataset.tab;
+        const submitBtn = this.accountForm.querySelector('button[type="submit"]');
+        this.setButtonLoading(submitBtn, true);
+        
+        try {
+            if (currentTab === 'profile') {
+                await this.handleProfileUpdate();
+            } else if (currentTab === 'password') {
+                await this.handlePasswordUpdate();
+            }
+        } catch (error) {
+            console.error('Erreur mise à jour compte:', error);
+        } finally {
+            this.setButtonLoading(submitBtn, false);
+        }
+    }
+    
+    /**
+     * Gère la mise à jour du profil
+     */
+    async handleProfileUpdate() {
+        const name = document.getElementById('accountName').value.trim();
+        
+        if (!name || name.length < 2) {
+            this.showMessage(this.accountForm, 'Le nom doit contenir au moins 2 caractères', 'error');
+            return;
+        }
+        
+        const result = await this.authService.updateProfile(name);
+        
+        if (result.success) {
+            this.showMessage(this.accountForm, 'Profil mis à jour avec succès !', 'success');
+            this.updateUIForLoggedInUser(result.user);
+            setTimeout(() => this.hideAccountModal(), 2000);
+        } else {
+            this.showMessage(this.accountForm, result.message, 'error');
+        }
+    }
+    
+    /**
+     * Gère la mise à jour du mot de passe
+     */
+    async handlePasswordUpdate() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // Validation
+        const errors = [];
+        if (!currentPassword) errors.push('Mot de passe actuel requis');
+        if (!newPassword || newPassword.length < 6) errors.push('Le nouveau mot de passe doit contenir au moins 6 caractères');
+        if (newPassword !== confirmPassword) errors.push('Les mots de passe ne correspondent pas');
+        
+        if (errors.length > 0) {
+            this.showMessage(this.accountForm, errors.join('<br>'), 'error');
+            return;
+        }
+        
+        const result = await this.authService.updatePassword(currentPassword, newPassword);
+        
+        if (result.success) {
+            this.showMessage(this.accountForm, 'Mot de passe mis à jour avec succès !', 'success');
+            this.resetPasswordForm();
+            setTimeout(() => this.hideAccountModal(), 2000);
+        } else {
+            this.showMessage(this.accountForm, result.message, 'error');
+        }
+    }
+    
+    /**
+     * Gère la suppression du compte
+     */
+    async handleDeleteAccount() {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible.')) {
+            return;
+        }
+        
+        const password = prompt('Veuillez confirmer votre mot de passe pour supprimer le compte :');
+        if (!password) return;
+        
+        const result = await this.authService.deleteAccount(password);
+        
+        if (result.success) {
+            this.hideAccountModal();
+            this.updateUIForLoggedOutUser();
+            this.showNotification('Compte supprimé avec succès', 'info');
+        } else {
+            this.showMessage(this.accountForm, result.message, 'error');
+        }
+    }
+    
+    /**
+     * Réinitialise le formulaire de gestion du compte
+     */
+    resetAccountForm() {
+        this.accountForm?.reset();
+        this.resetPasswordForm();
+        
+        // Supprimer tous les messages
+        this.accountForm?.querySelectorAll('.error-message, .success-message, .info-message')
+            .forEach(msg => msg.remove());
+    }
+    
+    /**
+     * Réinitialise seulement les champs de mot de passe
+     */
+    resetPasswordForm() {
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
     }
 
     /**

@@ -35,20 +35,20 @@ export const CONFIG = {
     // Configuration des parcours
     ROUTE_GENERATION: {
         // Nombre maximum d'essais pour générer un parcours
-        MAX_ATTEMPTS: 3,
+        MAX_ATTEMPTS: 8,  // Augmenté pour plus de précision
         
-        // Tolérance de distance (pourcentage)
+        // Tolérance de distance (pourcentage) - AMÉLIORÉE pour plus de précision
         DISTANCE_TOLERANCE: {
-            SHORT: 0.08,    // ≤ 8km : 8%
-            MEDIUM: 0.12,   // 8-20km : 12%
-            LONG: 0.20,     // > 20km : 20%
-            VERY_LONG: 0.25 // > 50km : 25%
+            SHORT: 0.05,    // ≤ 8km : 5% (400m max sur 8km)
+            MEDIUM: 0.08,   // 8-20km : 8% (1.6km max sur 20km)
+            LONG: 0.12,     // > 20km : 12% (6km max sur 50km)
+            VERY_LONG: 0.15 // > 50km : 15% (7.5km max sur 50km)
         },
         
         // Configuration des points de passage
         WAYPOINTS: {
             MIN_POINTS: 2,
-            MAX_POINTS: 8,
+            MAX_POINTS: 10,  // Augmenté pour parcours complexes
             BATCH_SIZE: 3, // Traitement par batch pour l'API
             DELAY_BETWEEN_BATCHES: 50, // ms
             DELAY_BETWEEN_API_CALLS: 30 // ms

@@ -1,17 +1,19 @@
 /* Styles pour l'authentification utilisateur */
 
-/* Bouton utilisateur dans le header */
-#userBtn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: auto;
+/* Conteneur utilisateur */
+.user-container {
+    position: relative;
 }
 
+/* Gestion du texte dans le bouton utilisateur */
 #userBtn span {
     display: none;
     font-size: 0.875rem;
     font-weight: 500;
+}
+
+#userBtn {
+    position: relative;
 }
 
 @media (min-width: 768px) {
@@ -131,13 +133,15 @@
     background: white;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    min-width: 200px;
-    z-index: 9999;
+    box-shadow: var(--shadow-xl);
+    min-width: 220px;
+    z-index: 10000;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-10px);
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .user-menu.active {
@@ -187,12 +191,28 @@
 
 /* État connecté du bouton utilisateur */
 #userBtn.logged-in {
-    background: rgba(var(--primary-rgb), 0.1);
-    color: var(--primary);
+    background: var(--primary);
+    color: white;
+    box-shadow: var(--shadow-lg);
 }
 
 #userBtn.logged-in:hover {
-    background: rgba(var(--primary-rgb), 0.2);
+    background: var(--primary-dark, #4f46e5);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+}
+
+#userBtn.logged-in::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border: 2px solid white;
+    border-radius: 50%;
+    z-index: 1;
 }
 
 /* Responsive */
@@ -207,8 +227,14 @@
     }
     
     .user-menu {
-        right: -50px;
-        min-width: 180px;
+        right: -20px;
+        min-width: 200px;
+        max-width: calc(100vw - 40px);
+    }
+    
+    /* Ajuster le bouton utilisateur sur mobile */
+    #userBtn span {
+        display: none !important;
     }
 }
 
@@ -273,4 +299,109 @@
 
 .success-message i {
     color: #059669;
+}
+
+/* ==== MODALE DE GESTION DU COMPTE ==== */
+
+/* Système d'onglets */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-4);
+    gap: 0;
+}
+
+.tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: var(--space-3) var(--space-4);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-weight: 500;
+}
+
+.tab-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.05);
+}
+
+/* Contenu des onglets */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Email en lecture seule */
+#accountEmail {
+    background: var(--bg-secondary);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Bouton danger */
+.btn-danger {
+    background: #dc2626;
+    color: white;
+    border: 1px solid #dc2626;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
+/* Actions avec bouton danger séparé */
+.modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+
+.modal-actions .btn:not(.btn-danger) {
+    flex: 1;
+    min-width: 120px;
+}
+
+.modal-actions .btn-danger {
+    width: 100%;
+    margin-top: var(--space-2);
+    opacity: 0.8;
+    font-size: 0.875rem;
+}
+
+/* Responsive onglets */
+@media (max-width: 480px) {
+    .tab-btn {
+        padding: var(--space-2);
+        font-size: 0.875rem;
+    }
+    
+    .tab-btn span {
+        display: none;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+    }
+    
+    .modal-actions .btn {
+        width: 100%;
+    }
 }

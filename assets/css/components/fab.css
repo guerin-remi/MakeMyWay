@@ -1,0 +1,232 @@
+/* ==========================================================================
+   MakeMyWay - FAB (Floating Action Buttons) modernes pour mobile 2025
+   ========================================================================== */
+
+/* FAB principal - Générer le parcours */
+.fab-generate {
+    position: fixed;
+    bottom: calc(40vh + 20px); /* Au-dessus du panneau en mode peek */
+    right: 16px;
+    z-index: 1002;
+    
+    /* Design Material Design 3 (2025) */
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    border: none;
+    border-radius: 28px;
+    
+    /* Taille et espacement */
+    height: 56px;
+    padding: 0 20px;
+    min-width: 120px;
+    
+    /* Flexbox pour alignement */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    
+    /* Ombre moderne */
+    box-shadow: 
+        0 4px 12px rgba(99, 102, 241, 0.4),
+        0 8px 32px rgba(99, 102, 241, 0.2);
+    
+    /* Animations et transitions */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(1);
+    
+    /* Typographie */
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    
+    /* Accessibility */
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* États du FAB principal */
+.fab-generate:hover {
+    transform: scale(1.05);
+    box-shadow: 
+        0 6px 16px rgba(99, 102, 241, 0.5),
+        0 12px 40px rgba(99, 102, 241, 0.3);
+}
+
+.fab-generate:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+}
+
+.fab-generate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: scale(1);
+}
+
+/* Icône et texte du FAB */
+.fab-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fab-text {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* FAB secondaire - Reset */
+.fab-reset {
+    position: fixed;
+    bottom: calc(40vh + 20px);
+    right: calc(16px + 140px); /* À côté du FAB principal */
+    z-index: 1002;
+    
+    /* Design plus discret */
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+    border-radius: 50%;
+    
+    /* Taille circulaire */
+    width: 48px;
+    height: 48px;
+    
+    /* Centrage */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Ombre légère */
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.12),
+        0 4px 16px rgba(0, 0, 0, 0.08);
+    
+    /* Animation */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(1);
+    
+    /* Accessibility */
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* États du FAB reset */
+.fab-reset:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+    transform: scale(1.1);
+}
+
+.fab-reset:active {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
+}
+
+/* Animation d'apparition */
+.fab-generate {
+    animation: fabSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-reset {
+    animation: fabSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+}
+
+@keyframes fabSlideIn {
+    from {
+        transform: translateY(100px) scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* États dynamiques du FAB selon l'état de l'app */
+.fab-generate.loading {
+    pointer-events: none;
+}
+
+.fab-generate.loading .fab-icon {
+    animation: fabSpin 1s linear infinite;
+}
+
+.fab-generate.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    animation: fabPulse 0.6s ease-out;
+}
+
+@keyframes fabSpin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fabPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Adaptations selon la hauteur du panneau */
+@media (max-height: 600px) {
+    .fab-generate, .fab-reset {
+        bottom: calc(35vh + 16px);
+    }
+}
+
+/* Position ajustée quand le panneau est en mode full */
+body.panel-full .fab-generate,
+body.panel-full .fab-reset {
+    bottom: calc(15vh + 20px);
+}
+
+/* Masquer sur très petits écrans */
+@media (max-width: 320px) {
+    .fab-text {
+        display: none;
+    }
+    
+    .fab-generate {
+        min-width: 56px;
+        border-radius: 50%;
+    }
+}
+
+/* Mode sombre (si activé plus tard) */
+@media (prefers-color-scheme: dark) {
+    .fab-reset {
+        background: #374151;
+        color: #d1d5db;
+        border-color: #4b5563;
+    }
+    
+    .fab-reset:hover {
+        background: #7f1d1d;
+        border-color: #dc2626;
+        color: #fca5a5;
+    }
+}
+
+/* Ripple effect moderne (optionnel) */
+.fab-generate::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.fab-generate:active::after {
+    width: 100px;
+    height: 100px;
+}

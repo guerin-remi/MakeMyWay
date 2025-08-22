@@ -34,7 +34,7 @@ export class MapManager {
         }
 
         try {
-            // Créer la carte Google Maps
+            // Créer la carte Google Maps avec interface épurée
             this.map = new google.maps.Map(mapContainer, {
                 center: { 
                     lat: CONFIG.MAP.DEFAULT_CENTER[0], 
@@ -42,17 +42,29 @@ export class MapManager {
                 },
                 zoom: CONFIG.MAP.DEFAULT_ZOOM,
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
-                // Options de style et contrôles
-                zoomControl: false, // On utilisera nos propres contrôles
-                mapTypeControl: false,
-                scaleControl: true,
-                streetViewControl: false,
-                rotateControl: false,
-                fullscreenControl: false,
-                // Style moderne
+                
+                // DÉSACTIVATION COMPLÈTE DE TOUS LES CONTRÔLES GOOGLE MAPS
+                zoomControl: false,           // Supprime les boutons "+/-"
+                mapTypeControl: false,        // Supprime le sélecteur Plan/Satellite
+                scaleControl: false,          // Supprime l'échelle
+                streetViewControl: false,     // Supprime le bonhomme Street View
+                rotateControl: false,         // Supprime la rotation
+                fullscreenControl: false,     // Supprime le bouton plein écran
+                
+                // Interface complètement épurée
+                disableDefaultUI: true,       // Désactive TOUS les contrôles par défaut
+                gestureHandling: 'greedy',    // Gestes natifs du mobile optimisés
+                keyboardShortcuts: false,     // Désactive les raccourcis clavier
+                
+                // Style moderne et épuré
                 styles: [
                     {
                         featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{ visibility: "off" }]
+                    },
+                    {
+                        featureType: "transit",
                         elementType: "labels",
                         stylers: [{ visibility: "off" }]
                     }
@@ -170,11 +182,31 @@ export class MapManager {
             console.log('📍 Point de départ déplacé:', newPos);
         });
 
-        // Clic droit pour supprimer
+        // Clic droit pour supprimer (desktop) et double tap (mobile)
         this.markers.start.addListener('rightclick', (e) => {
             this.removeStartMarker();
             if (this.onMarkerMove) {
                 this.onMarkerMove('start', null);
+            }
+        });
+
+        // Double tap pour mobile (suppression)
+        let startTapCount = 0;
+        let startTapTimer = null;
+        this.markers.start.addListener('click', (e) => {
+            startTapCount++;
+            if (startTapCount === 1) {
+                startTapTimer = setTimeout(() => {
+                    startTapCount = 0; // Single tap - ne rien faire de spécial
+                }, 300);
+            } else if (startTapCount === 2) {
+                clearTimeout(startTapTimer);
+                startTapCount = 0;
+                // Double tap détecté - supprimer le marker
+                this.removeStartMarker();
+                if (this.onMarkerMove) {
+                    this.onMarkerMove('start', null);
+                }
             }
         });
 
@@ -184,7 +216,7 @@ export class MapManager {
                 <div class="marker-popup">
                     <strong><i class="fas fa-play"></i> Point de départ</strong>
                     <div class="popup-tips">
-                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit ou double tap pour supprimer</small>
                     </div>
                 </div>
             `
@@ -249,11 +281,31 @@ export class MapManager {
             console.log('🏁 Point d\'arrivée déplacé:', newPos);
         });
 
-        // Clic droit pour supprimer
+        // Clic droit pour supprimer (desktop) et double tap (mobile)
         this.markers.end.addListener('rightclick', (e) => {
             this.removeEndMarker();
             if (this.onMarkerMove) {
                 this.onMarkerMove('end', null);
+            }
+        });
+
+        // Double tap pour mobile (suppression)
+        let endTapCount = 0;
+        let endTapTimer = null;
+        this.markers.end.addListener('click', (e) => {
+            endTapCount++;
+            if (endTapCount === 1) {
+                endTapTimer = setTimeout(() => {
+                    endTapCount = 0; // Single tap - ne rien faire de spécial
+                }, 300);
+            } else if (endTapCount === 2) {
+                clearTimeout(endTapTimer);
+                endTapCount = 0;
+                // Double tap détecté - supprimer le marker
+                this.removeEndMarker();
+                if (this.onMarkerMove) {
+                    this.onMarkerMove('end', null);
+                }
             }
         });
 
@@ -263,7 +315,7 @@ export class MapManager {
                 <div class="marker-popup">
                     <strong><i class="fas fa-flag-checkered"></i> Point d'arrivée</strong>
                     <div class="popup-tips">
-                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit pour supprimer</small>
+                        <small>💡 Glissez pour déplacer<br>🖱️ Clic droit ou double tap pour supprimer</small>
                     </div>
                 </div>
             `
@@ -622,6 +674,34 @@ export class MapManager {
             } : null,
             poisCount: this.markers.pois.length
         };
+    }
+
+    /**
+     * Obtient la position du point de départ
+     * @returns {Object|null} Position du point de départ {lat, lng}
+     */
+    getStartPoint() {
+        if (this.markers.start) {
+            return {
+                lat: this.markers.start.getPosition().lat(),
+                lng: this.markers.start.getPosition().lng()
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Obtient la position du point d'arrivée
+     * @returns {Object|null} Position du point d'arrivée {lat, lng}
+     */
+    getEndPoint() {
+        if (this.markers.end) {
+            return {
+                lat: this.markers.end.getPosition().lat(),
+                lng: this.markers.end.getPosition().lng()
+            };
+        }
+        return null;
     }
 
     /**

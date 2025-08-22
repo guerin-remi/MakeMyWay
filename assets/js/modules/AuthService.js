@@ -302,4 +302,110 @@ export class AuthService {
 
         return errors;
     }
+
+    /**
+     * Met à jour le profil utilisateur
+     * @param {string} name - Nouveau nom
+     * @returns {Promise<Object>} Résultat de la mise à jour
+     */
+    async updateProfile(name) {
+        try {
+            console.log('📝 Mise à jour du profil:', { name });
+
+            const response = await fetch(`${this.baseURL}/profile`, {
+                method: 'PUT',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({ name })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erreur lors de la mise à jour du profil');
+            }
+
+            // Mettre à jour les données utilisateur locales
+            this.saveUserToStorage(data.user);
+
+            console.log('✅ Profil mis à jour:', data.user.name);
+            return { success: true, user: data.user, message: data.message };
+
+        } catch (error) {
+            console.error('❌ Erreur mise à jour profil:', error);
+            return { 
+                success: false, 
+                message: error.message 
+            };
+        }
+    }
+
+    /**
+     * Met à jour le mot de passe
+     * @param {string} currentPassword - Mot de passe actuel
+     * @param {string} newPassword - Nouveau mot de passe
+     * @returns {Promise<Object>} Résultat de la mise à jour
+     */
+    async updatePassword(currentPassword, newPassword) {
+        try {
+            console.log('🔐 Mise à jour du mot de passe');
+
+            const response = await fetch(`${this.baseURL}/password`, {
+                method: 'PUT',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erreur lors de la mise à jour du mot de passe');
+            }
+
+            console.log('✅ Mot de passe mis à jour');
+            return { success: true, message: data.message };
+
+        } catch (error) {
+            console.error('❌ Erreur mise à jour mot de passe:', error);
+            return { 
+                success: false, 
+                message: error.message 
+            };
+        }
+    }
+
+    /**
+     * Supprime le compte utilisateur
+     * @param {string} password - Mot de passe de confirmation
+     * @returns {Promise<Object>} Résultat de la suppression
+     */
+    async deleteAccount(password) {
+        try {
+            console.log('🗑️ Suppression du compte');
+
+            const response = await fetch(`${this.baseURL}/delete`, {
+                method: 'DELETE',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({ password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erreur lors de la suppression du compte');
+            }
+
+            // Déconnecter l'utilisateur
+            this.logout();
+
+            console.log('✅ Compte supprimé');
+            return { success: true, message: data.message };
+
+        } catch (error) {
+            console.error('❌ Erreur suppression compte:', error);
+            return { 
+                success: false, 
+                message: error.message 
+            };
+        }
+    }
 }

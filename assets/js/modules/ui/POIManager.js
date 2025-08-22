@@ -1,3 +1,5 @@
+import POICategoryAdapter from '../POICategoryAdapter.js';
+
 /**
  * Gestionnaire des Points d'Intérêt (POI) pour MakeMyWay
  * Gère l'ajout, la suppression et l'affichage des POI
@@ -16,6 +18,55 @@ export class POIManager {
         
         // État
         this.pois = [];
+        this.currentMode = 'walking';
+        this.categoryAdapter = POICategoryAdapter;
+    }
+
+    /**
+     * Met à jour les catégories POI selon le mode de transport
+     * @param {string} mode - Mode de transport
+     */
+    updateCategoriesForMode(mode) {
+        this.currentMode = mode;
+        const categories = this.categoryAdapter.getCategoriesForMode(mode);
+        
+        // Mettre à jour l'interface avec les nouvelles catégories
+        const poiGrid = document.querySelector('.poi-grid');
+        if (!poiGrid) return;
+        
+        poiGrid.innerHTML = '';
+        categories.forEach(category => {
+            const categoryEl = document.createElement('div');
+            categoryEl.className = 'poi-category';
+            categoryEl.dataset.preset = category.id;
+            categoryEl.innerHTML = `
+                <span class="icon">${category.icon}</span>
+                <span>${category.label}</span>
+            `;
+            
+            // Ajouter l'événement de clic
+            categoryEl.addEventListener('click', async () => {
+                try {
+                    const startPoint = this.mapManager.getStartPoint();
+                    if (!startPoint) {
+                        throw new Error('Veuillez d\'abord définir un point de départ sur la carte');
+                    }
+                    await this.togglePOICategory(categoryEl, startPoint);
+                } catch (error) {
+                    console.error('Erreur toggle POI:', error);
+                    // Afficher l'erreur à l'utilisateur
+                    if (window.uiManager && window.uiManager.routeFeedback) {
+                        window.uiManager.routeFeedback.showToast(error.message, 'error');
+                    } else {
+                        alert(error.message);
+                    }
+                }
+            });
+            
+            poiGrid.appendChild(categoryEl);
+        });
+        
+        console.log(`🎯 Catégories POI mises à jour pour le mode: ${mode}`);
     }
 
     /**
@@ -53,15 +104,33 @@ export class POIManager {
     async addPOIsByCategory(category, startPoint) {
         const pois = await this.apiService.searchPOIsByCategory(category, startPoint);
         
-        pois.forEach(poi => this.addPOIToList(poi));
+        // Ajouter la catégorie aux POI et les ajouter à la liste
+        const addedPOIs = [];
+        pois.forEach(poi => {
+            poi.category = category; // Marquer la catégorie
+            try {
+                this.addPOIToList(poi);
+                addedPOIs.push(poi);
+            } catch (error) {
+                // Ignorer les doublons silencieusement
+            }
+        });
         
-        if (pois.length === 0) {
+        if (addedPOIs.length === 0 && pois.length === 0) {
             throw new Error(`Aucun POI ${category} trouvé dans cette zone`);
-        } else {
-            console.log(`✅ ${pois.length} POI ${category} ajoutés`);
+        } else if (addedPOIs.length > 0) {
+            console.log(`✅ ${addedPOIs.length} nouveaux POI ${category} ajoutés`);
+            // Feedback visuel global
+            if (window.uiManager && window.uiManager.routeFeedback) {
+                window.uiManager.routeFeedback.showToast(
+                    `${addedPOIs.length} POI ${category} ajoutés`, 
+                    'success', 
+                    2000
+                );
+            }
         }
         
-        return pois;
+        return addedPOIs;
     }
 
     /**
@@ -115,7 +184,8 @@ export class POIManager {
         );
         
         if (exists) {
-            throw new Error('Ce POI est déjà dans votre liste');
+            console.warn(`POI déjà présent: ${poi.name}`);
+            return; // Ne pas lancer d'erreur, juste ignorer
         }
         
         // Ajouter à la liste
@@ -125,7 +195,16 @@ export class POIManager {
         // Ajouter le marqueur sur la carte
         poi._marker = this.mapManager.addPOIMarker(poi);
         
-        console.log(`✅ POI ajouté: ${poi.name}`);
+        console.log(`✅ POI ajouté: ${poi.name} (${poi.category || 'custom'})`);
+        
+        // Feedback visuel
+        if (window.uiManager && window.uiManager.routeFeedback) {
+            window.uiManager.routeFeedback.showToast(
+                `POI ajouté: ${poi.name}`, 
+                'success', 
+                2000
+            );
+        }
     }
 
     /**
@@ -219,5 +298,59 @@ export class POIManager {
     setPOIs(pois) {
         this.pois = [...pois];
         this.updatePOIChips();
+    }
+
+    /**
+     * Met à jour les POI selon un thème sélectionné
+     * @param {string} theme - Thème sélectionné
+     * @param {Array} selectedTypes - Types de POI à activer
+     */
+    async updatePoisFromTheme(theme, selectedTypes) {
+        // Reset tous les POI actuels
+        this.reset();
+        
+        if (theme === 'default' || selectedTypes.length === 0) {
+            console.log('🎨 Thème libre sélectionné - aucune pré-sélection');
+            return;
+        }
+
+        // Obtenir le point de départ
+        const startPoint = this.mapManager.getStartPoint();
+        if (!startPoint) {
+            console.warn('⚠️ Aucun point de départ défini pour les POI thématiques');
+            return;
+        }
+
+        try {
+            console.log(`🎯 Application du thème "${theme}" avec les types:`, selectedTypes);
+            
+            // Rechercher les POI pour chaque type sélectionné
+            for (const poiType of selectedTypes) {
+                try {
+                    await this.addPOIsByCategory(poiType, startPoint);
+                } catch (error) {
+                    console.warn(`⚠️ Erreur pour les POI ${poiType}:`, error.message);
+                    // Continuer avec les autres types même en cas d'erreur
+                }
+            }
+
+            // Feedback global
+            if (window.uiManager && window.uiManager.routeFeedback && this.pois.length > 0) {
+                window.uiManager.routeFeedback.showToast(
+                    `Thème "${theme}" appliqué - ${this.pois.length} POI trouvés`, 
+                    'success', 
+                    3000
+                );
+            }
+
+        } catch (error) {
+            console.error('Erreur application thème:', error);
+            if (window.uiManager && window.uiManager.routeFeedback) {
+                window.uiManager.routeFeedback.showToast(
+                    'Erreur lors de l\'application du thème', 
+                    'error'
+                );
+            }
+        }
     }
 }

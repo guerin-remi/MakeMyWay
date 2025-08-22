@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#6366f1">
     
     <title>MakeMyWay - Interface Moderne</title>
+    <!-- Cache bust: 2025-08-22-16:12 -->
     
     <!-- Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,12 +26,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     
     <!-- Apple Touch Icon (PWA iOS) -->
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     
     <!-- Apple PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="MakeMyWay">
     
@@ -43,48 +45,33 @@
     <!-- Styles CSS modulaires -->
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/components/panel.css">
+    <link rel="stylesheet" href="assets/css/components/main-controls.css">
     <link rel="stylesheet" href="assets/css/components/map.css">
     <link rel="stylesheet" href="assets/css/components/results.css">
     <link rel="stylesheet" href="assets/css/components/auth.css">
+    <link rel="stylesheet" href="assets/css/components/fab.css">
+    <link rel="stylesheet" href="assets/css/mobile-improvements.css">
+    <link rel="stylesheet" href="assets/css/mobile-ux-simplified.css">
 </head>
 <body>
     <!-- Container principal avec carte plein écran -->
     <div class="app-container">
-        <!-- Carte plein écran -->
+        <!-- Carte plein écran épurée -->
         <div id="map" class="map"></div>
 
-        <!-- Contrôles de carte (zoom, etc.) -->
-        <div class="map-controls">
-            <button class="map-control-btn" id="zoomInBtn" title="Zoom avant">
-                <i class="fas fa-plus"></i>
-            </button>
-            <button class="map-control-btn" id="zoomOutBtn" title="Zoom arrière">
-                <i class="fas fa-minus"></i>
-            </button>
-            <button class="map-control-btn" id="centerMapBtn" title="Centrer sur le parcours">
-                <i class="fas fa-crosshairs"></i>
-            </button>
-            <button class="map-control-btn" id="fullscreenBtn" title="Plein écran">
-                <i class="fas fa-expand"></i>
-            </button>
-        </div>
+
 
         <!-- Header flottant -->
         <header class="floating-header">
-            <div class="logo-bubble">
-                <i class="fas fa-running"></i>
-                <h1>MakeMyWay</h1>
-            </div>
             <div class="header-controls">
-                <button class="floating-btn" id="userBtn" title="Mon compte">
-                    <i class="fas fa-user"></i>
-                    <span id="userBtnText">Connexion</span>
+                <!-- Bouton Reset -->
+                <button class="floating-btn reset-btn" id="resetBtn" title="Recommencer" style="display: none;">
+                    <i class="fas fa-redo"></i>
                 </button>
+                
+                <!-- Bouton Paramètres unique -->
                 <button class="floating-btn" id="settingsBtn" title="Paramètres">
                     <i class="fas fa-cog"></i>
-                </button>
-                <button class="floating-btn" id="helpBtn" title="Aide">
-                    <i class="fas fa-question-circle"></i>
                 </button>
             </div>
         </header>
@@ -95,141 +82,227 @@
             <div class="panel-header">
                 <h2 class="panel-title">
                     <i class="fas fa-route"></i>
-                    Configuration
+                    Configuration du parcours
                 </h2>
-                <button class="close-panel" id="closePanel">
-                    <i class="fas fa-times"></i>
-                </button>
             </div>
             
             <div class="panel-content">
-                <!-- Section Itinéraire -->
-                <div class="section">
-                    <h3 class="section-title">
-                        <i class="fas fa-map-marker-alt"></i>
-                        Points du parcours
-                    </h3>
-                    
-                    <div class="input-group">
-                        <label for="startAddress" class="input-label">Point de départ</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="startAddress" class="input" placeholder="Cliquez sur la carte ou saisissez une adresse">
-                            <button class="btn btn-ghost btn-sm" id="useLocationBtn">
-                                <i class="fas fa-crosshairs"></i>
-                            </button>
+                <div class="panel-scrollable">
+                
+                <!-- Composant de recherche principal avec géolocalisation -->
+                <div class="search-component-container">
+                    <div class="search-bar-primary">
+                        <div class="search-input-container">
+                            <i class="fas fa-search search-icon"></i>
+                            <span class="search-placeholder">Où souhaitez-vous aller ?</span>
+                            <input type="text" id="destinationAddress" class="search-input-primary" placeholder="Où souhaitez-vous aller ?" value="" autocomplete="street-address" style="display: none;">
                         </div>
                     </div>
+                    <button id="geoLocationBtnCollapsed" class="geolocation-btn-squircle" type="button" aria-label="Ma position">
+                        <i class="fas fa-crosshairs"></i>
+                    </button>
+                </div>
+                <div class="search-helper-text">Astuce : faites glisser vers le haut pour ouvrir les suggestions</div>
 
-                    <div class="input-group">
-                        <label for="endAddress" class="input-label">Point d'arrivée (optionnel)</label>
-                        <input type="text" id="endAddress" class="input" placeholder="Laissez vide pour un parcours en boucle">
+                <!-- Sélecteur de type de parcours (divulgation progressive) -->
+                <div class="route-type-selector" id="routeTypeSelector" style="display: none;">
+                    <div class="route-type-header">
+                        <label class="control-label">
+                            <i class="fas fa-route"></i>
+                            Type de parcours
+                        </label>
                     </div>
-
-                    <label class="switch-label">
-                        <span class="switch">
-                            <input type="checkbox" id="returnToStart">
-                            <span class="switch-slider"></span>
-                        </span>
-                        Retour automatique au départ
-                    </label>
+                    <div class="route-type-buttons">
+                        <button class="route-type-btn active" id="routeTypeLoop" data-type="loop">
+                            <i class="fas fa-redo-alt"></i>
+                            <span>Faire une boucle</span>
+                        </button>
+                        <button class="route-type-btn" id="routeTypeOneWay" data-type="oneway">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>Aller-simple</span>
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Section Paramètres -->
-                <div class="section">
-                    <h3 class="section-title">
-                        <i class="fas fa-cogs"></i>
-                        Paramètres du parcours
-                    </h3>
-                    
-                    <div class="input-group">
-                        <label class="input-label">Mode de déplacement</label>
-                        <div class="toggle-group">
-                            <div class="toggle-option">
-                                <input type="radio" id="mode-walking" name="travelMode" value="walking" class="toggle-input" checked>
-                                <label for="mode-walking" class="toggle-label">
-                                    <i class="fas fa-walking toggle-icon"></i>
+                <!-- Contrôles principaux directement visibles -->
+                <div class="main-controls">
+
+                    <!-- Bloc Mode de déplacement -->
+                    <div class="section-block">
+                        <div class="section-header">
+                            <i class="fas fa-directions"></i>
+                            <span class="section-title">Mode de déplacement</span>
+                        </div>
+                        <div class="section-controls">
+                            <div class="mode-cards">
+                                <button class="mode-card active" data-mode="walking">
+                                    <i class="fas fa-walking"></i>
                                     <span>Marche</span>
-                                </label>
-                            </div>
-                            <div class="toggle-option">
-                                <input type="radio" id="mode-running" name="travelMode" value="running" class="toggle-input">
-                                <label for="mode-running" class="toggle-label">
-                                    <i class="fas fa-running toggle-icon"></i>
+                                </button>
+                                <button class="mode-card" data-mode="running">
+                                    <i class="fas fa-running"></i>
                                     <span>Course</span>
-                                </label>
-                            </div>
-                            <div class="toggle-option">
-                                <input type="radio" id="mode-cycling" name="travelMode" value="cycling" class="toggle-input">
-                                <label for="mode-cycling" class="toggle-label">
-                                    <i class="fas fa-bicycle toggle-icon"></i>
+                                </button>
+                                <button class="mode-card" data-mode="cycling">
+                                    <i class="fas fa-bicycle"></i>
                                     <span>Vélo</span>
-                                </label>
+                                </button>
+                            </div>
+                            <!-- Hidden inputs for form compatibility -->
+                            <input type="radio" id="mode-walking" name="travelMode" value="walking" class="segment-input" checked style="display: none;">
+                            <input type="radio" id="mode-running" name="travelMode" value="running" class="segment-input" style="display: none;">
+                            <input type="radio" id="mode-cycling" name="travelMode" value="cycling" class="segment-input" style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- Bloc Ambiance du parcours -->
+                    <div class="section-block">
+                        <div class="section-header">
+                            <i class="fas fa-palette"></i>
+                            <span class="section-title">Ambiance du parcours</span>
+                        </div>
+                        <div class="section-controls">
+                            <div class="chip-selector" id="theme-selector">
+                                <button class="chip-button active" data-theme="default">🏃 Libre</button>
+                                <button class="chip-button" data-theme="nature">🌳 Nature</button>
+                                <button class="chip-button" data-theme="culture">🏛️ Culture</button>
+                                <button class="chip-button" data-theme="urban">🏙️ Urbain</button>
+                                <button class="chip-button" data-theme="sport">⚽ Sport</button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="input-group">
-                        <div class="slider-header">
-                            <label class="input-label">Distance cible</label>
-                            <span class="slider-value" id="distanceValue">5 km</span>
+
+                    <!-- Bloc Distance cible -->
+                    <div class="section-block">
+                        <div class="section-header">
+                            <i class="fas fa-ruler-horizontal"></i>
+                            <span class="section-title">Distance cible</span>
                         </div>
-                        <div class="slider-container">
-                            <input type="range" id="targetDistance" class="slider" min="1" max="10" value="5" step="0.5">
-                            <div class="slider-labels">
-                                <span>1km</span>
-                                <span id="maxLabel">10km</span>
+                        <div class="section-controls">
+                            <div class="chip-selector distance-selector">
+                                <button class="chip-button" data-distance="3">3 km</button>
+                                <button class="chip-button active" data-distance="5">5 km</button>
+                                <button class="chip-button" data-distance="8">8 km</button>
+                                <button class="chip-button" data-distance="10">10 km</button>
+                                <button class="chip-button custom" data-distance="custom">Personnalisé</button>
+                            </div>
+                            
+                            <!-- Slider personnalisé (masqué par défaut) -->
+                            <div class="distance-slider-custom" id="customDistanceSlider" style="display: none;">
+                                <input type="range" id="targetDistance" class="slider" min="1" max="15" value="5" step="0.5">
+                                <div class="slider-labels">
+                                    <span>1km</span>
+                                    <span id="maxLabel">15km</span>
+                                </div>
+                                <div class="distance-value-display" id="distanceValue">5 km</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section POI -->
-                <div class="section">
-                    <h3 class="section-title">
-                        <i class="fas fa-star"></i>
-                        Points d'intérêt
-                    </h3>
-                    
-                    <div class="poi-grid">
-                        <div class="poi-category" data-preset="nature">
-                            <i class="fas fa-leaf poi-icon"></i>
-                            <span class="poi-name">Nature</span>
-                        </div>
-                        <div class="poi-category" data-preset="culture">
-                            <i class="fas fa-university poi-icon"></i>
-                            <span class="poi-name">Culture</span>
-                        </div>
-                        <div class="poi-category" data-preset="sport">
-                            <i class="fas fa-dumbbell poi-icon"></i>
-                            <span class="poi-name">Sport</span>
-                        </div>
-                        <div class="poi-category" data-preset="panorama">
-                            <i class="fas fa-mountain poi-icon"></i>
-                            <span class="poi-name">Panorama</span>
-                        </div>
-                        <div class="poi-category" data-preset="eau">
-                            <i class="fas fa-tint poi-icon"></i>
-                            <span class="poi-name">Points d'eau</span>
-                        </div>
-                        <div class="poi-category" data-preset="shopping">
-                            <i class="fas fa-shopping-bag poi-icon"></i>
-                            <span class="poi-name">Shopping</span>
-                        </div>
+                <!-- Bloc Options avancées (cliquable) -->
+                <div class="section-block options-block" id="advancedOptionsBlock">
+                    <div class="section-header clickable">
+                        <i class="fas fa-sliders-h"></i>
+                        <span class="section-title">Options avancées</span>
+                        <i class="fas fa-chevron-right section-chevron"></i>
                     </div>
+                </div>
 
-                    <div class="input-group">
-                        <label for="customPoi" class="input-label">Lieu personnalisé</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="customPoi" class="input" placeholder="Ex: Tour Eiffel, parc...">
-                            <button class="btn btn-secondary btn-sm" id="addPoiBtn">
-                                <i class="fas fa-plus"></i>
-                            </button>
+                <!-- Ancien accordéon caché par défaut -->
+                <div class="accordion-section" style="display: none;">
+                    <button class="accordion-header">
+                        <div class="accordion-title">
+                            <i class="fas fa-sliders-h"></i>
+                            Options avancées
                         </div>
-                        <div class="poi-chips" id="poiChips"></div>
+                    </button>
+                    <div class="accordion-content">
+                        <div class="accordion-body">
+                            <!-- Point d'arrivée -->
+                            <div class="input-group">
+                                <label for="endAddress" class="input-label">Point d'arrivée (optionnel)</label>
+                                <input type="text" id="endAddress" class="input" placeholder="Laissez vide pour un parcours en boucle" autocomplete="street-address">
+                            </div>
+
+                            <label class="switch-label">
+                                <span class="switch">
+                                    <input type="checkbox" id="returnToStart">
+                                    <span class="switch-slider"></span>
+                                </span>
+                                Retour automatique au départ
+                            </label>
+
+                            <!-- Points d'intérêt -->
+                            <div class="poi-section">
+                                <h4 class="subsection-title">Points d'intérêt</h4>
+                                <div class="poi-grid">
+                                    <div class="poi-category" data-preset="nature" data-poi-type="park">
+                                        <i class="fas fa-leaf poi-icon"></i>
+                                        <span class="poi-name">Nature</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="culture" data-poi-type="historic">
+                                        <i class="fas fa-university poi-icon"></i>
+                                        <span class="poi-name">Culture</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="sport" data-poi-type="sport">
+                                        <i class="fas fa-dumbbell poi-icon"></i>
+                                        <span class="poi-name">Sport</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="panorama" data-poi-type="tourism">
+                                        <i class="fas fa-mountain poi-icon"></i>
+                                        <span class="poi-name">Panorama</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="eau" data-poi-type="leisure">
+                                        <i class="fas fa-tint poi-icon"></i>
+                                        <span class="poi-name">Points d'eau</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="shopping" data-poi-type="shop">
+                                        <i class="fas fa-shopping-bag poi-icon"></i>
+                                        <span class="poi-name">Shopping</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="cafe" data-poi-type="restaurant">
+                                        <i class="fas fa-coffee poi-icon"></i>
+                                        <span class="poi-name">Cafés</span>
+                                    </div>
+                                    <div class="poi-category" data-preset="entertainment" data-poi-type="entertainment">
+                                        <i class="fas fa-music poi-icon"></i>
+                                        <span class="poi-name">Divertissement</span>
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <label for="customPoi" class="input-label">Lieu personnalisé</label>
+                                    <div class="input-with-btn">
+                                        <input type="text" id="customPoi" class="input" placeholder="Ex: Tour Eiffel, parc..." autocomplete="off">
+                                        <button class="btn btn-secondary btn-sm" id="addPoiBtn">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                    <div class="poi-chips" id="poiChips"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                </div>
+                </div><!-- Fin panel-scrollable -->
+                
+                <!-- Barre d'action sticky -->
+                <div class="panel-action-bar">
+                    <button class="generate-route-btn" id="generateBtn" type="button">
+                        <i class="fas fa-route"></i>
+                        <span>Générer le parcours</span>
+                    </button>
                 </div>
             </div>
         </div>
+
+
+        <!-- FAB secondaire pour reset (apparaît après génération) -->
+        <button class="fab-reset" id="resetBtn" style="display: none;" aria-label="Recommencer">
+            <i class="fas fa-redo"></i>
+        </button>
 
         <!-- Panel d'aide -->
         <div class="help-panel" id="helpPanel">
@@ -271,16 +344,6 @@
             </div>
         </div>
 
-        <!-- Boutons d'action flottants -->
-        <div class="floating-actions">
-            <button class="reset-btn" id="resetBtn" title="Réinitialiser">
-                <i class="fas fa-refresh"></i>
-            </button>
-            <button class="action-btn" id="generateBtn">
-                <i class="fas fa-play"></i>
-                <span>Générer le parcours</span>
-            </button>
-        </div>
 
         <!-- Panel de résultats -->
         <div class="results-panel" id="resultsPanel">
@@ -336,11 +399,11 @@
                     <form id="loginForm">
                         <div class="input-group">
                             <label for="loginEmail" class="input-label">Email</label>
-                            <input type="email" id="loginEmail" class="input" required>
+                            <input type="email" id="loginEmail" class="input" required autocomplete="email">
                         </div>
                         <div class="input-group">
                             <label for="loginPassword" class="input-label">Mot de passe</label>
-                            <input type="password" id="loginPassword" class="input" required>
+                            <input type="password" id="loginPassword" class="input" required autocomplete="current-password">
                         </div>
                         <div class="modal-actions">
                             <button type="submit" class="btn btn-primary">
@@ -369,15 +432,15 @@
                     <form id="registerForm">
                         <div class="input-group">
                             <label for="registerName" class="input-label">Nom</label>
-                            <input type="text" id="registerName" class="input" required>
+                            <input type="text" id="registerName" class="input" required autocomplete="name">
                         </div>
                         <div class="input-group">
                             <label for="registerEmail" class="input-label">Email</label>
-                            <input type="email" id="registerEmail" class="input" required>
+                            <input type="email" id="registerEmail" class="input" required autocomplete="email">
                         </div>
                         <div class="input-group">
                             <label for="registerPassword" class="input-label">Mot de passe</label>
-                            <input type="password" id="registerPassword" class="input" required minlength="6">
+                            <input type="password" id="registerPassword" class="input" required minlength="6" autocomplete="new-password">
                             <small class="input-help">Au moins 6 caractères</small>
                         </div>
                         <div class="modal-actions">
@@ -394,26 +457,92 @@
             </div>
         </div>
 
-        <!-- Menu utilisateur -->
-        <div class="user-menu" id="userMenu">
-            <div class="user-info">
-                <i class="fas fa-user-circle"></i>
-                <div class="user-details">
-                    <span id="userName">Nom d'utilisateur</span>
-                    <small id="userEmail">email@example.com</small>
+        <!-- Modale de gestion du compte -->
+        <div class="modal-overlay" id="accountModal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-user-cog"></i>
+                        Mon compte
+                    </h3>
+                    <button class="modal-close" id="closeAccount">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <form id="accountForm">
+                        <!-- Onglets -->
+                        <div class="tabs">
+                            <button type="button" class="tab-btn active" data-tab="profile">
+                                <i class="fas fa-user"></i>
+                                Profil
+                            </button>
+                            <button type="button" class="tab-btn" data-tab="password">
+                                <i class="fas fa-lock"></i>
+                                Mot de passe
+                            </button>
+                        </div>
+                        
+                        <!-- Contenu Profil -->
+                        <div class="tab-content active" id="profileTab">
+                            <div class="input-group">
+                                <label for="accountName" class="input-label">Nom complet</label>
+                                <input type="text" id="accountName" class="input" required minlength="2" autocomplete="name">
+                            </div>
+                            <div class="input-group">
+                                <label for="accountEmail" class="input-label">Email</label>
+                                <input type="email" id="accountEmail" class="input" required autocomplete="email">
+                                <small class="input-help">L'email ne peut pas être modifié</small>
+                            </div>
+                            <div class="input-group">
+                                <label for="accountCreated" class="input-label">Membre depuis</label>
+                                <input type="text" id="accountCreated" class="input" readonly>
+                            </div>
+                        </div>
+                        
+                        <!-- Contenu Mot de passe -->
+                        <div class="tab-content" id="passwordTab">
+                            <div class="input-group">
+                                <label for="currentPassword" class="input-label">Mot de passe actuel</label>
+                                <input type="password" id="currentPassword" class="input" required autocomplete="current-password">
+                            </div>
+                            <div class="input-group">
+                                <label for="newPassword" class="input-label">Nouveau mot de passe</label>
+                                <input type="password" id="newPassword" class="input" required minlength="6" autocomplete="new-password">
+                                <small class="input-help">Au moins 6 caractères</small>
+                            </div>
+                            <div class="input-group">
+                                <label for="confirmPassword" class="input-label">Confirmer le mot de passe</label>
+                                <input type="password" id="confirmPassword" class="input" required minlength="6" autocomplete="new-password">
+                            </div>
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                Sauvegarder
+                            </button>
+                            <button type="button" class="btn btn-ghost" id="cancelAccount">
+                                Annuler
+                            </button>
+                            <button type="button" class="btn btn-danger" id="deleteAccount">
+                                <i class="fas fa-trash"></i>
+                                Supprimer le compte
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="user-actions">
-                <button class="btn btn-ghost" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Déconnexion
-                </button>
-            </div>
         </div>
+
+        <!-- Menu utilisateur maintenant dans header-controls -->
     </div>
 
     <!-- Scripts -->
     <!-- Fonction pont globale pour Google Maps -->
+    <!-- Script pour supprimer les avertissements pendant le dev -->
+    <script src="assets/js/suppress-warnings.js"></script>
+    
     <script>
         /**
          * Fonction globale appelée par le callback Google Maps

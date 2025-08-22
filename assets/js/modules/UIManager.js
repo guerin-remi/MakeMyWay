@@ -3,23 +3,28 @@ import { POIManager } from './ui/POIManager.js';
 import { PanelManager } from './ui/PanelManager.js';
 import { ResultsManager } from './ui/ResultsManager.js';
 import { FormManager } from './ui/FormManager.js';
+import RouteFeedback from './ui/RouteFeedback.js';
 
 /**
  * Gestionnaire de l'interface utilisateur et des interactions DOM
  */
 export class UIManager {
-    constructor(apiService, mapManager, routeGenerator) {
+    constructor(apiService, mapManager, routeGenerator, authUI = null) {
         this.apiService = apiService;
         this.mapManager = mapManager;
         this.routeGenerator = routeGenerator;
+        this.authUI = authUI;
         this.elements = {};
         this.state = {
-            startPoint: null,
+            destinationPoint: null,
+            startPoint: null, // Par défaut: géolocalisation
             endPoint: null,
             currentMode: 'walking',
             targetDistance: 5,
             returnToStart: false,
-            isLoading: false
+            isLoading: false,
+            routeType: 'loop', // 'loop' ou 'oneway'
+            destinationSelected: false
         };
         
         // Gestionnaires seront initialisés après le cache des éléments
@@ -27,6 +32,7 @@ export class UIManager {
         this.panelManager = null;
         this.resultsManager = null;
         this.formManager = null;
+        this.routeFeedback = RouteFeedback;
     }
 
     /**
@@ -54,12 +60,13 @@ export class UIManager {
      */
     cacheElements() {
         const elementIds = [
-            'settingsBtn', 'helpBtn', 'mainPanel', 'helpPanel', 'closePanel', 'closeHelp',
-            'startAddress', 'endAddress', 'useLocationBtn', 'returnToStart',
+            'settingsBtn', 'mainPanel', 'helpPanel', 'closePanel', 'closeHelp',
+            'destinationAddress', 'endAddress', 'returnToStart',
+            'routeTypeSelector', 'routeTypeLoop', 'routeTypeOneWay',
             'targetDistance', 'distanceValue', 'maxLabel', 'generateBtn', 'resetBtn',
             'exportBtn', 'customPoi', 'addPoiBtn', 'poiChips',
             'resultsPanel', 'closeResults', 'distanceResult', 'durationResult', 'deviationResult',
-            'loadingOverlay', 'zoomInBtn', 'zoomOutBtn', 'centerMapBtn', 'fullscreenBtn',
+            'loadingOverlay', 'geoLocationBtn',
             'startAddressSuggestions', 'endAddressSuggestions', 'poiSuggestions'
         ];
 
@@ -67,13 +74,19 @@ export class UIManager {
             this.elements[id] = document.getElementById(id);
         });
 
-        // Éléments par sélecteur
+        // Éléments par sélecteur (mis à jour pour la nouvelle structure)
         this.elements.travelModeInputs = document.querySelectorAll('input[name="travelMode"]');
         this.elements.poiCategories = document.querySelectorAll('.poi-category');
         
         // Vérifier les éléments critiques
         const criticalElements = ['generateBtn', 'mainPanel', 'targetDistance'];
         const missingElements = criticalElements.filter(id => !this.elements[id]);
+        
+        console.log('🔧 Debug éléments UI:', {
+            settingsBtn: !!this.elements.settingsBtn,
+            mainPanel: !!this.elements.mainPanel,
+            targetDistance: !!this.elements.targetDistance
+        });
         
         if (missingElements.length > 0) {
             console.warn('Éléments DOM manquants:', missingElements);
@@ -96,8 +109,7 @@ export class UIManager {
         const panelElements = {
             mainPanel: this.elements.mainPanel,
             helpPanel: this.elements.helpPanel,
-            settingsBtn: this.elements.settingsBtn,
-            helpBtn: this.elements.helpBtn
+            settingsBtn: this.elements.settingsBtn  // Bouton settings
         };
         this.panelManager = new PanelManager(panelElements);
         
@@ -112,7 +124,7 @@ export class UIManager {
         
         // Gestionnaire des formulaires
         const formElements = {
-            startAddress: this.elements.startAddress,
+            destinationAddress: this.elements.destinationAddress,
             endAddress: this.elements.endAddress,
             returnToStart: this.elements.returnToStart,
             targetDistance: this.elements.targetDistance,
@@ -130,10 +142,41 @@ export class UIManager {
      * Configure tous les écouteurs d'événements
      */
     setupEventListeners() {
-        // Boutons de navigation
-        this.addEventListenerSafe('settingsBtn', 'click', () => this.panelManager.toggleMainPanel());
-        this.addEventListenerSafe('helpBtn', 'click', () => this.panelManager.toggleHelpPanel());
-        this.addEventListenerSafe('closePanel', 'click', () => this.panelManager.closeMainPanel());
+        // Bouton Reset
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.resetApplication();
+            });
+        }
+
+        // Plus besoin de bouton configure - panneau visible par défaut
+        
+        // Nouveau bouton settings pour les paramètres d'affichage
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn) {
+            // Supprimer d'abord tous les événements existants
+            settingsBtn.replaceWith(settingsBtn.cloneNode(true));
+            const newSettingsBtn = document.getElementById('settingsBtn');
+            
+            newSettingsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🎨 Settings btn cliqué - Gestion du compte');
+                if (this.authUI && this.authUI.showAccountModal) {
+                    this.authUI.showAccountModal();
+                } else {
+                    console.warn('⚠️ AuthUI non disponible, fallback sur panneau d\'aide');
+                    this.panelManager.toggleHelpPanel();
+                }
+            });
+            
+            // Mettre à jour la référence
+            this.elements.settingsBtn = newSettingsBtn;
+            console.log('✅ Événement settings configuré pour paramètres d\'affichage');
+        }
+        // Help panel fermé - plus de bouton help
         this.addEventListenerSafe('closeHelp', 'click', () => this.panelManager.closeHelpPanel());
 
         // Actions principales
@@ -141,16 +184,17 @@ export class UIManager {
         this.addEventListenerSafe('resetBtn', 'click', () => this.resetAll());
         this.addEventListenerSafe('exportBtn', 'click', () => this.exportGPX());
 
-        // Géolocalisation
-        this.addEventListenerSafe('useLocationBtn', 'click', () => this.useCurrentLocation());
+        // Nouveau flux de destination
+        this.setupDestinationFlow();
 
         // Contrôles de parcours
         this.addEventListenerSafe('returnToStart', 'change', (e) => this.formManager.handleReturnToStartToggle(e.target.checked));
         this.addEventListenerSafe('targetDistance', 'input', (e) => this.formManager.updateDistanceValue(e.target.value));
 
-        // Modes de transport
-        if (this.elements.travelModeInputs) {
-            this.elements.travelModeInputs.forEach(input => {
+        // Modes de transport (nouveaux sélecteurs)
+        const travelModeInputs = document.querySelectorAll('input[name="travelMode"]');
+        if (travelModeInputs) {
+            travelModeInputs.forEach(input => {
                 input.addEventListener('change', (e) => this.formManager.handleModeChange(e.target.value));
             });
         }
@@ -168,14 +212,22 @@ export class UIManager {
             });
         }
 
-        // Contrôles de carte
-        this.addEventListenerSafe('zoomInBtn', 'click', () => this.mapManager.zoomIn());
-        this.addEventListenerSafe('zoomOutBtn', 'click', () => this.mapManager.zoomOut());
-        this.addEventListenerSafe('centerMapBtn', 'click', () => this.centerMap());
-        this.addEventListenerSafe('fullscreenBtn', 'click', () => this.mapManager.toggleFullscreen());
+        // Sélecteur de thématique
+        this.setupThemeSelector();
+
+        // Sélecteurs avec le nouveau design
+        this.setupModeSelector();
+        this.setupThemeSelector();
+        this.setupDistanceSelector();
+        this.setupAdvancedOptions();
+
+        // Boutons de géolocalisation (principal et dans le panneau collapsed)
+        this.addEventListenerSafe('geoLocationBtn', 'click', () => this.handleGeolocation());
+        this.addEventListenerSafe('geoLocationBtnCollapsed', 'click', () => this.handleGeolocation());
 
         // Résultats
         this.addEventListenerSafe('closeResults', 'click', () => this.resultsManager.hideResults());
+
 
         // Événements globaux
         this.setupGlobalEventListeners();
@@ -206,7 +258,14 @@ export class UIManager {
         
         // Mettre à jour l'affichage de la distance
         this.formManager.updateDistanceValue(this.state.targetDistance);
+        
+        // Initialiser les catégories POI selon le mode par défaut
+        if (this.poiManager) {
+            this.poiManager.updateCategoriesForMode(this.state.currentMode);
+        }
+
     }
+
 
     /**
      * Configure les gestionnaires responsive
@@ -221,6 +280,135 @@ export class UIManager {
         window.addEventListener('resize', () => {
             this.mapManager.invalidateSize();
         });
+
+        // Gestion des accordéons mobile
+        this.setupAccordionListeners();
+    }
+
+    /**
+     * Configure l'accordéon unique (Options avancées)
+     */
+    setupAccordionListeners() {
+        const accordionHeader = document.querySelector('.accordion-header');
+        if (accordionHeader) {
+            accordionHeader.addEventListener('click', (e) => {
+                const section = accordionHeader.closest('.accordion-section');
+                
+                // Simple toggle pour l'accordéon unique
+                section.classList.toggle('active');
+                
+                console.log('🔧 Options avancées:', section.classList.contains('active') ? 'ouvertes' : 'fermées');
+            });
+        }
+    }
+    
+    /**
+     * Configure le bloc Options avancées cliquable
+     */
+    setupAdvancedOptions() {
+        const optionsBlock = document.getElementById('advancedOptionsBlock');
+        if (!optionsBlock) return;
+        
+        optionsBlock.addEventListener('click', () => {
+            // Pour l'instant, on peut afficher une notification ou ouvrir un panneau
+            console.log('Navigation vers les options avancées');
+            
+            // Option 1: Ouvrir un modal
+            // this.showAdvancedOptionsModal();
+            
+            // Option 2: Faire apparaître l'ancien accordéon temporairement
+            const accordionSection = document.querySelector('.accordion-section');
+            if (accordionSection) {
+                accordionSection.style.display = 'block';
+                accordionSection.classList.add('active');
+                accordionSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    }
+
+    /**
+     * Configure le sélecteur de thématique
+     */
+    setupThemeSelector() {
+        const themeChips = document.querySelectorAll('.theme-chip');
+        if (!themeChips.length) return;
+
+        themeChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                // Retirer la classe active de tous les chips
+                themeChips.forEach(c => c.classList.remove('active'));
+                
+                // Ajouter l'animation de sélection
+                chip.classList.add('selecting');
+                setTimeout(() => chip.classList.remove('selecting'), 300);
+                
+                // Activer le chip sélectionné
+                chip.classList.add('active');
+                
+                // Obtenir le thème sélectionné
+                const theme = chip.dataset.theme;
+                
+                // Mettre à jour les POI selon le thème
+                this.updatePoisFromTheme(theme);
+                
+                console.log('🎨 Thème sélectionné:', theme);
+            });
+        });
+    }
+
+    /**
+     * Met à jour la sélection des POI selon le thème choisi
+     * @param {string} theme - Thème sélectionné (default, nature, culture, urban, sport)
+     */
+    updatePoisFromTheme(theme) {
+        if (!this.poiManager || !this.elements.poiCategories) return;
+
+        // Mapping des thèmes vers les types de POI
+        const themeMapping = {
+            default: [], // Aucune pré-sélection
+            nature: ['park', 'tourism'],
+            culture: ['historic', 'art', 'tourism'],
+            urban: ['shop', 'restaurant', 'entertainment'],
+            sport: ['sport', 'leisure']
+        };
+
+        const selectedTypes = themeMapping[theme] || [];
+        
+        // Désactiver tous les POI d'abord
+        this.elements.poiCategories.forEach(category => {
+            category.classList.remove('active');
+        });
+
+        // Activer les POI correspondant au thème
+        if (selectedTypes.length > 0) {
+            this.elements.poiCategories.forEach(category => {
+                const poiType = category.dataset.poiType;
+                if (selectedTypes.includes(poiType)) {
+                    category.classList.add('active');
+                }
+            });
+        }
+
+        // Mettre à jour les POI dans le gestionnaire
+        if (this.poiManager) {
+            this.poiManager.updatePoisFromTheme(theme, selectedTypes);
+        }
+
+        console.log(`🎯 POI mis à jour pour le thème "${theme}":`, selectedTypes);
+    }
+
+    /**
+     * Obtient le nom du mode en français
+     * @param {string} mode - Mode de transport
+     * @returns {string} Nom du mode
+     */
+    getModeName(mode) {
+        const modeNames = {
+            walking: 'marche',
+            running: 'course',
+            cycling: 'vélo'
+        };
+        return modeNames[mode] || mode;
     }
 
 
@@ -247,9 +435,10 @@ export class UIManager {
     setStartPoint(latlng) {
         this.state.startPoint = latlng;
         this.mapManager.setStartMarker(latlng);
-        this.updateAddressField(latlng, 'startAddress');
+        this.updateAddressField(latlng, 'destinationAddress');
         this.updateRouteInfo();
         console.log('📍 Point de départ défini:', latlng);
+        
     }
 
     /**
@@ -365,6 +554,53 @@ export class UIManager {
     }
 
     /**
+     * Gère la géolocalisation via le bouton moderne
+     */
+    async handleGeolocation() {
+        const geoBtn = this.elements.geoLocationBtn;
+        
+        try {
+            // État de chargement du bouton
+            if (geoBtn) {
+                geoBtn.classList.add('loading');
+            }
+            
+            const position = await this.mapManager.getCurrentPosition();
+            this.setStartPoint(position);
+            this.mapManager.centerOn(position, 16);
+            
+            // État de succès
+            if (geoBtn) {
+                geoBtn.classList.remove('loading');
+                geoBtn.classList.add('success');
+                setTimeout(() => {
+                    geoBtn.classList.remove('success');
+                }, 1000);
+            }
+            
+            console.log('🎯 Position obtenue via bouton géolocalisation:', position);
+            
+        } catch (error) {
+            console.error('Erreur géolocalisation:', error);
+            
+            // Retirer l'état de chargement
+            if (geoBtn) {
+                geoBtn.classList.remove('loading');
+            }
+            
+            // Feedback d'erreur
+            if (this.routeFeedback) {
+                this.routeFeedback.showToast(
+                    error.message || 'Impossible d\'obtenir votre position', 
+                    'error'
+                );
+            } else {
+                this.showError(error.message);
+            }
+        }
+    }
+
+    /**
      * Génère un nouveau parcours
      */
     async generateRoute() {
@@ -376,7 +612,18 @@ export class UIManager {
         }
 
         try {
-            this.showLoading(CONFIG.MESSAGES.INFO.LOADING);
+            // État de chargement du FAB
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.classList.add('loading');
+            }
+            
+            // Afficher le feedback visuel amélioré
+            this.routeFeedback.show({
+                title: 'Génération du parcours',
+                message: `Préparation d'un parcours de ${this.state.targetDistance}km en ${this.getModeName(this.state.currentMode)}`,
+                showProgress: true
+            });
             this.state.isLoading = true;
 
             // Validation des paramètres
@@ -395,19 +642,46 @@ export class UIManager {
                 pois: this.poiManager ? this.poiManager.getPOIs() : []
             };
 
-            // Générer le parcours
+            // Générer le parcours avec feedback de progression
+            let attemptCount = 0;
+            const originalGenerateRoute = this.routeGenerator.generateRoute.bind(this.routeGenerator);
+            
+            // Wrapper pour capturer les tentatives
+            this.routeGenerator.generateRoute = async (...args) => {
+                attemptCount++;
+                this.routeFeedback.updateProgress(attemptCount, {
+                    distance: this.state.targetDistance,
+                    tolerance: this.state.targetDistance <= 8 ? 0.05 : 
+                              this.state.targetDistance <= 20 ? 0.08 :
+                              this.state.targetDistance <= 50 ? 0.12 : 0.15
+                });
+                return originalGenerateRoute(...args);
+            };
+            
             const routeData = await this.routeGenerator.generateRoute(
                 this.state.startPoint,
                 this.state.targetDistance,
                 this.state.currentMode,
                 options
             );
+            
+            // Restaurer la méthode originale
+            this.routeGenerator.generateRoute = originalGenerateRoute;
 
             // Afficher sur la carte
             this.mapManager.displayRoute(routeData.route, this.state.currentMode);
 
             // Afficher les résultats
             this.resultsManager.showResults(routeData);
+
+            // Afficher le bouton reset
+            this.showResetButton();
+
+
+            // Feedback de succès
+            this.routeFeedback.showSuccess(
+                `Parcours de ${routeData.distance.toFixed(1)}km généré avec succès !`
+            );
 
             // Fermer automatiquement le panneau sur mobile
             if (window.innerWidth <= CONFIG.UI.BREAKPOINTS.MOBILE) {
@@ -418,10 +692,18 @@ export class UIManager {
 
         } catch (error) {
             console.error('Erreur génération:', error);
-            this.showError(error.message || CONFIG.MESSAGES.ERRORS.NO_ROUTE);
+            // Feedback d'erreur
+            this.routeFeedback.showError(
+                error.message || CONFIG.MESSAGES.ERRORS.NO_ROUTE
+            );
         } finally {
-            this.hideLoading();
             this.state.isLoading = false;
+            
+            // Retirer l'état de chargement du FAB
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.classList.remove('loading');
+            }
         }
     }
 
@@ -524,6 +806,58 @@ export class UIManager {
         this.resultsManager.hideResults();
         
         console.log('✅ Application remise à zéro');
+        
+        // Masquer le bouton reset
+        this.hideResetButton();
+    }
+
+    /**
+     * Remet l'application à zéro complètement
+     */
+    resetApplication() {
+        // Confirmation sur mobile
+        if (window.innerWidth <= 768) {
+            if (this.routeFeedback) {
+                this.routeFeedback.showToast('Application remise à zéro', 'info');
+            }
+        } else {
+            if (!confirm('Voulez-vous vraiment tout remettre à zéro ?')) {
+                return;
+            }
+        }
+        
+        // Utiliser la méthode reset existante
+        this.resetAll();
+    }
+
+    /**
+     * Affiche le bouton de reset FAB
+     */
+    showResetButton() {
+        const resetBtn = document.getElementById('resetBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        
+        if (resetBtn) {
+            resetBtn.style.display = 'flex';
+        }
+        
+        // Changer l'état du FAB générer en succès
+        if (generateBtn) {
+            generateBtn.classList.add('success');
+            setTimeout(() => {
+                generateBtn.classList.remove('success');
+            }, 1000);
+        }
+    }
+
+    /**
+     * Masque le bouton de reset FAB
+     */
+    hideResetButton() {
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn) {
+            resetBtn.style.display = 'none';
+        }
     }
 
     /**
@@ -531,7 +865,7 @@ export class UIManager {
      */
     resetInterface() {
         // Vider les champs de saisie
-        ['startAddress', 'endAddress', 'customPoi'].forEach(fieldId => {
+        ['destinationAddress', 'endAddress', 'customPoi'].forEach(fieldId => {
             if (this.elements[fieldId]) {
                 this.elements[fieldId].value = '';
             }
@@ -616,11 +950,11 @@ export class UIManager {
             if (type === 'start') {
                 if (latlng) {
                     this.state.startPoint = latlng;
-                    this.updateAddressField(latlng, 'startAddress');
+                    this.updateAddressField(latlng, 'destinationAddress');
                 } else {
                     this.state.startPoint = null;
-                    if (this.elements.startAddress) {
-                        this.elements.startAddress.value = '';
+                    if (this.elements.destinationAddress) {
+                        this.elements.destinationAddress.value = '';
                     }
                 }
             } else if (type === 'end') {
@@ -636,5 +970,302 @@ export class UIManager {
             }
             this.updateRouteInfo();
         });
+    }
+
+    /**
+     * Bascule entre les paramètres d'affichage (thème, etc.)
+     */
+    toggleDisplaySettings() {
+        console.log('🎨 Paramètres d\'affichage cliqué');
+        
+        // Pour l'instant, simple basculement de thème
+        const isDark = document.body.classList.toggle('dark-theme');
+        
+        // Animation du bouton
+        const settingsBtn = this.elements.settingsBtn;
+        if (settingsBtn) {
+            settingsBtn.classList.toggle('active', isDark);
+        }
+        
+        // Notification
+        const theme = isDark ? 'sombre' : 'clair';
+        this.showSuccess(`Thème ${theme} activé`);
+    }
+
+    /**
+     * Configure le sélecteur de distance par boutons/chips
+     */
+    /**
+     * Configure le sélecteur de mode avec les cartes tactiles
+     */
+    setupModeSelector() {
+        const modeCards = document.querySelectorAll('.mode-card');
+        const radioInputs = document.querySelectorAll('input[name="travelMode"]');
+        
+        if (!modeCards.length) return;
+        
+        modeCards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Enlever l'active de toutes les cartes
+                modeCards.forEach(c => c.classList.remove('active'));
+                
+                // Activer la carte cliquée
+                card.classList.add('active');
+                
+                const mode = card.getAttribute('data-mode');
+                
+                // Synchroniser avec les radio inputs cachés
+                const matchingInput = document.querySelector(`input[value="${mode}"]`);
+                if (matchingInput) {
+                    matchingInput.checked = true;
+                    matchingInput.dispatchEvent(new Event('change'));
+                }
+                
+                // Mettre à jour l'état
+                this.handleModeChange(mode);
+                
+                console.log(`Mode sélectionné: ${mode}`);
+            });
+        });
+    }
+    
+    /**
+     * Configure le sélecteur de thème avec les puces
+     */
+    setupThemeSelector() {
+        const themeSelector = document.getElementById('theme-selector');
+        if (!themeSelector) return;
+        
+        const themeChips = themeSelector.querySelectorAll('.chip-button');
+        
+        themeChips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Enlever l'active de toutes les puces
+                themeChips.forEach(c => c.classList.remove('active'));
+                
+                // Activer la puce cliquée
+                chip.classList.add('active');
+                
+                const theme = chip.getAttribute('data-theme');
+                this.state.selectedTheme = theme;
+                
+                console.log(`Thème sélectionné: ${theme}`);
+            });
+        });
+    }
+    
+    setupDistanceSelector() {
+        const distanceChips = document.querySelectorAll('.distance-selector .chip-button');
+        const customSlider = document.getElementById('customDistanceSlider');
+        const targetDistanceInput = document.getElementById('targetDistance');
+        const distanceValueDisplay = document.getElementById('distanceValue');
+
+        if (!distanceChips.length) return;
+
+        distanceChips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Enlever l'active de toutes les puces
+                distanceChips.forEach(c => c.classList.remove('active'));
+                
+                // Activer le chip cliqué
+                chip.classList.add('active');
+                
+                const distance = chip.getAttribute('data-distance');
+                
+                if (distance === 'custom') {
+                    // Afficher le slider personnalisé
+                    if (customSlider) {
+                        customSlider.style.display = 'block';
+                        customSlider.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    
+                    // Synchroniser avec l'état actuel du slider
+                    if (targetDistanceInput && distanceValueDisplay) {
+                        const currentValue = parseFloat(targetDistanceInput.value);
+                        this.state.targetDistance = currentValue;
+                        distanceValueDisplay.textContent = `${currentValue} km`;
+                    }
+                } else {
+                    // Masquer le slider personnalisé
+                    if (customSlider) {
+                        customSlider.style.display = 'none';
+                    }
+                    
+                    // Définir la distance prédéfinie
+                    const numDistance = parseFloat(distance);
+                    this.state.targetDistance = numDistance;
+                    
+                    // Mettre à jour le slider caché pour la cohérence
+                    if (targetDistanceInput) {
+                        targetDistanceInput.value = numDistance;
+                    }
+                    
+                    // Déclencher l'événement de mise à jour si le FormManager l'attend
+                    if (this.formManager && this.formManager.updateDistanceValue) {
+                        this.formManager.updateDistanceValue(numDistance);
+                    }
+                    
+                    console.log(`Distance sélectionnée: ${numDistance} km`);
+                }
+            });
+        });
+
+        // Gestion du slider personnalisé
+        if (targetDistanceInput && distanceValueDisplay) {
+            targetDistanceInput.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                distanceValueDisplay.textContent = `${value} km`;
+                this.state.targetDistance = value;
+                
+                // S'assurer que le chip "Personnalisé" est actif
+                const customChip = document.querySelector('.distance-selector .chip-button[data-distance="custom"]');
+                if (customChip && !customChip.classList.contains('active')) {
+                    distanceChips.forEach(c => c.classList.remove('active'));
+                    customChip.classList.add('active');
+                }
+                
+                // Déclencher l'événement de mise à jour
+                if (this.formManager && this.formManager.updateDistanceValue) {
+                    this.formManager.updateDistanceValue(value);
+                }
+            });
+        }
+
+        console.log('✅ Sélecteur de distance par boutons configuré');
+    }
+
+    /**
+     * Configure le nouveau flux de destination mobile-first
+     */
+    setupDestinationFlow() {
+        const destinationInput = this.elements.destinationAddress;
+        const routeTypeSelector = this.elements.routeTypeSelector;
+        const loopBtn = this.elements.routeTypeLoop;
+        const onewayBtn = this.elements.routeTypeOneWay;
+
+        if (!destinationInput || !routeTypeSelector) {
+            console.warn('⚠️ Éléments de destination manquants');
+            return;
+        }
+
+        // Écouteur sur le champ de destination
+        destinationInput.addEventListener('input', (e) => {
+            const value = e.target.value.trim();
+            
+            if (value.length > 0 && !this.state.destinationSelected) {
+                // Première saisie - afficher le sélecteur de type
+                this.showRouteTypeSelector();
+            } else if (value.length === 0) {
+                // Champ vidé - masquer le sélecteur
+                this.hideRouteTypeSelector();
+                this.state.destinationSelected = false;
+                this.state.destinationPoint = null;
+            }
+        });
+
+        // Gestion de la sélection du type de parcours
+        if (loopBtn) {
+            loopBtn.addEventListener('click', () => this.selectRouteType('loop'));
+        }
+        if (onewayBtn) {
+            onewayBtn.addEventListener('click', () => this.selectRouteType('oneway'));
+        }
+
+        console.log('✅ Flux de destination mobile-first configuré');
+    }
+
+    /**
+     * Affiche le sélecteur de type de parcours avec animation
+     */
+    showRouteTypeSelector() {
+        const selector = this.elements.routeTypeSelector;
+        if (selector) {
+            selector.style.display = 'block';
+            // Force reflow pour l'animation
+            selector.offsetHeight;
+            selector.classList.add('show');
+            
+            console.log('🎯 Sélecteur de type de parcours affiché');
+        }
+    }
+
+    /**
+     * Masque le sélecteur de type de parcours
+     */
+    hideRouteTypeSelector() {
+        const selector = this.elements.routeTypeSelector;
+        if (selector) {
+            selector.classList.remove('show');
+            setTimeout(() => {
+                if (!selector.classList.contains('show')) {
+                    selector.style.display = 'none';
+                }
+            }, 300);
+            
+            console.log('🎯 Sélecteur de type de parcours masqué');
+        }
+    }
+
+    /**
+     * Sélectionne le type de parcours
+     * @param {string} type - 'loop' ou 'oneway'
+     */
+    selectRouteType(type) {
+        const loopBtn = this.elements.routeTypeLoop;
+        const onewayBtn = this.elements.routeTypeOneWay;
+        
+        if (!loopBtn || !onewayBtn) return;
+
+        // Mise à jour visuelle
+        if (type === 'loop') {
+            loopBtn.classList.add('active', 'selecting');
+            onewayBtn.classList.remove('active');
+        } else {
+            onewayBtn.classList.add('active', 'selecting');
+            loopBtn.classList.remove('active');
+        }
+
+        // Animation de sélection
+        const activeBtn = type === 'loop' ? loopBtn : onewayBtn;
+        setTimeout(() => {
+            activeBtn.classList.remove('selecting');
+        }, 400);
+
+        // Mise à jour de l'état
+        this.state.routeType = type;
+        
+        console.log(`🎯 Type de parcours sélectionné: ${type}`);
+        
+        // Configurer la logique selon le type choisi
+        this.configureRouteLogic(type);
+    }
+
+    /**
+     * Configure la logique de génération selon le type de parcours
+     * @param {string} type - 'loop' ou 'oneway'
+     */
+    configureRouteLogic(type) {
+        const destinationValue = this.elements.destinationAddress?.value?.trim();
+        
+        if (!destinationValue) return;
+
+        if (type === 'loop') {
+            // Mode boucle : destination = waypoint, départ = géolocation, retour au départ
+            this.state.returnToStart = true;
+            console.log('🔄 Mode boucle activé - retour au point de départ');
+        } else {
+            // Mode aller-simple : destination = point d'arrivée, départ = géolocation
+            this.state.returnToStart = false;
+            console.log('➡️ Mode aller-simple activé');
+        }
+        
+        // Marquer la destination comme sélectionnée
+        this.state.destinationSelected = true;
     }
 }

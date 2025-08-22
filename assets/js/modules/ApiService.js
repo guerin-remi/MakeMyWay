@@ -299,6 +299,7 @@ export class ApiService {
 
         // Mapping des catégories vers les types/mots-clés Google Places
         const categoryMapping = {
+            // Catégories communes
             'nature': {
                 types: ['park'],
                 keywords: ['parc', 'jardin', 'nature', 'forêt', 'lac']
@@ -322,6 +323,45 @@ export class ApiService {
             'shopping': {
                 types: ['shopping_mall', 'store'],
                 keywords: ['centre commercial', 'magasin', 'boutique']
+            },
+            
+            // Nouvelles catégories adaptatives
+            // Marche
+            'cafe': {
+                types: ['cafe', 'restaurant', 'bakery'],
+                keywords: ['café', 'restaurant', 'boulangerie', 'bar']
+            },
+            'bench': {
+                types: ['park'],
+                keywords: ['banc', 'aire de repos', 'place', 'square']
+            },
+            
+            // Course
+            'water': {
+                types: ['park'],
+                keywords: ['fontaine', 'point d\'eau', 'eau potable']
+            },
+            'toilet': {
+                types: ['park'],
+                keywords: ['toilettes', 'wc', 'sanitaires']
+            },
+            'shade': {
+                types: ['park'],
+                keywords: ['ombre', 'couvert', 'arbres', 'parc ombragé']
+            },
+            
+            // Vélo
+            'bike_service': {
+                types: ['bicycle_store'],
+                keywords: ['réparation vélo', 'magasin vélo', 'atelier vélo']
+            },
+            'bike_parking': {
+                types: ['park'],
+                keywords: ['parking vélo', 'stationnement vélo', 'garage vélo']
+            },
+            'rest_area': {
+                types: ['park', 'tourist_attraction'],
+                keywords: ['aire de repos', 'aire de pique-nique', 'halte']
             }
         };
 

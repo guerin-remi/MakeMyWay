@@ -4,22 +4,12 @@
   "description": "Interface moderne pour la génération de parcours sportifs personnalisés",
   "icons": [
     {
-      "src": "/MakeMyWay/favicon.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
-    },
-    {
-      "src": "/MakeMyWay/favicon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/MakeMyWay/favicon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
     }
   ],
-  "start_url": "/MakeMyWay/",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#6366f1",
   "background_color": "#f8fafc",

@@ -11,14 +11,14 @@ export class FormManager {
         
         // Éléments DOM
         this.elements = {
-            startAddress: elements.startAddress,
+            destinationAddress: elements.destinationAddress,
             endAddress: elements.endAddress,
             returnToStart: elements.returnToStart,
             targetDistance: elements.targetDistance,
             distanceValue: elements.distanceValue,
             maxLabel: elements.maxLabel,
             travelModeInputs: elements.travelModeInputs,
-            startAddressSuggestions: elements.startAddressSuggestions,
+            destinationAddressSuggestions: elements.startAddressSuggestions,
             endAddressSuggestions: elements.endAddressSuggestions,
             poiSuggestions: elements.poiSuggestions
         };
@@ -69,9 +69,9 @@ export class FormManager {
      * @param {Object} options - Options de configuration
      */
     setupStartAddressAutocomplete(options) {
-        const input = this.elements.startAddress;
+        const input = this.elements.destinationAddress;
         if (!input) {
-            console.warn('⚠️ Champ startAddress non trouvé');
+            console.warn('⚠️ Champ destinationAddress non trouvé');
             return;
         }
 
@@ -404,6 +404,12 @@ export class FormManager {
     handleModeChange(mode) {
         this.uiManager.state.currentMode = mode;
         this.updateDistanceLimits(mode);
+        
+        // Mettre \u00e0 jour les cat\u00e9gories POI selon le mode
+        if (this.uiManager.poiManager) {
+            this.uiManager.poiManager.updateCategoriesForMode(mode);
+        }
+        
         console.log(`Mode de transport: ${mode}`);
     }
 
@@ -474,7 +480,7 @@ export class FormManager {
      */
     reset() {
         // Vider les champs de saisie
-        ['startAddress', 'endAddress'].forEach(fieldId => {
+        ['destinationAddress', 'endAddress'].forEach(fieldId => {
             if (this.elements[fieldId]) {
                 this.elements[fieldId].value = '';
             }

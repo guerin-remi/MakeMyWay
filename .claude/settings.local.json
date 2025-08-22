@@ -24,7 +24,13 @@
       "Bash(node:*)",
       "Bash(curl:*)",
       "Bash(git commit:*)",
-      "Bash(del test-modules.html test-app.html)"
+      "Bash(del test-modules.html test-app.html)",
+      "Bash(npm start)",
+      "Bash(debugstart-frontend.bat)",
+      "Bash(cmd /c:*)",
+      "Bash(start \"\" \"index.html\")",
+      "Bash(http-server:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

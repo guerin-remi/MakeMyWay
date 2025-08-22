@@ -172,10 +172,14 @@ class MakeMyWayApp {
         this.modules.uiManager = new UIManager(
             this.modules.apiService,
             this.modules.mapManager,
-            this.modules.routeGenerator
+            this.modules.routeGenerator,
+            this.modules.authUI
         );
         
         await this.modules.uiManager.initialize();
+        
+        // Rendre l'uiManager disponible globalement pour le feedback
+        window.uiManager = this.modules.uiManager;
         
         console.log('✅ UIManager initialisé');
     }
@@ -301,16 +305,7 @@ class MakeMyWayApp {
         errorContent.innerHTML = `
             <h2 style="color: #ef4444; margin-bottom: 1rem;">❌ Erreur d'Application</h2>
             <p style="line-height: 1.6; margin-bottom: 2rem;">${message}</p>
-            <button onclick="window.location.reload()" style="
-                background: #6366f1;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 0.5rem;
-                font-size: 1rem;
-                cursor: pointer;
-                transition: background 0.2s ease;
-            " onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+            <button class="error-reload-btn" onclick="window.location.reload()">
                 Recharger la page
             </button>
         `;

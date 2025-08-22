@@ -1,4 +1,5 @@
 import { CONFIG, ConfigUtils } from '../config.js';
+import RouteOptimizer from './RouteOptimizer.js';
 
 /**
  * Générateur de parcours intelligent avec différentes stratégies
@@ -96,9 +97,16 @@ export class RouteGenerator {
                 let finalWaypoints = [...waypoints];
                 
                 if (pois.length > 0) {
-                    console.log(`Ajout de ${pois.length} POI à l'itinéraire`);
-                    // Convertir les POI au format {lat, lng}
-                    const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                    console.log(`Optimisation de ${pois.length} POI pour l'itinéraire`);
+                    // Optimiser l'ordre des POI
+                    const optimizedPOIs = RouteOptimizer.optimizePOIOrder(
+                        startPoint, 
+                        null, // Pas de point de fin pour une boucle
+                        pois,
+                        true  // Retour au départ
+                    );
+                    // Convertir les POI optimisés au format {lat, lng}
+                    const poiPoints = optimizedPOIs.map(poi => ({ lat: poi.lat, lng: poi.lng }));
                     finalWaypoints = [...waypoints, ...poiPoints];
                 }
                 
@@ -158,9 +166,16 @@ export class RouteGenerator {
             let basePoints = [startPoint, endPoint];
             
             if (pois.length > 0) {
-                console.log(`Intégration de ${pois.length} POI dans l'itinéraire A→B`);
-                // Convertir les POI au format {lat, lng} et les insérer entre le départ et l'arrivée
-                const poiPoints = pois.map(poi => ({ lat: poi.lat, lng: poi.lng }));
+                console.log(`Optimisation de ${pois.length} POI pour l'itinéraire A→B`);
+                // Optimiser l'ordre des POI pour minimiser les détours
+                const optimizedPOIs = RouteOptimizer.optimizePOIOrder(
+                    startPoint,
+                    endPoint,
+                    pois,
+                    false // Pas de retour au départ
+                );
+                // Convertir les POI optimisés et les insérer dans l'ordre optimal
+                const poiPoints = optimizedPOIs.map(poi => ({ lat: poi.lat, lng: poi.lng }));
                 basePoints = [startPoint, ...poiPoints, endPoint];
             }
             
