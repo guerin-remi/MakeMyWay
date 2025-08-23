@@ -65,6 +65,14 @@ router.post('/directions', async (req, res) => {
         const travelMode = travelModeMapping[mode];
         
         // Construction de l'URL de l'API Google Directions
+        // Construire les paramètres avoid de manière propre
+        const avoidParams = [];
+        avoidParams.push('tolls'); // Toujours éviter les péages
+        if (mode === 'walking' || mode === 'running') {
+            avoidParams.push('highways'); // Éviter les autoroutes pour piétons/coureurs
+        }
+        const avoidString = avoidParams.length > 0 ? `&avoid=${avoidParams.join('|')}` : '';
+
         const googleApiUrl = `https://maps.googleapis.com/maps/api/directions/json?` +
             `origin=${encodeURIComponent(origin)}` +
             `&destination=${encodeURIComponent(destination)}` +
@@ -73,8 +81,7 @@ router.post('/directions', async (req, res) => {
             `&units=metric` +
             `&language=fr` +
             `&region=fr` +
-            `&avoid=tolls` +
-            `${(mode === 'walking' || mode === 'running') ? '&avoid=highways' : ''}` +
+            `${avoidString}` +
             `&key=${process.env.MAPS_API_KEY}`;
         
         console.log(`📡 Appel Google Directions API: ${points.length} points`);

@@ -30,7 +30,8 @@
       "Bash(cmd /c:*)",
       "Bash(start \"\" \"index.html\")",
       "Bash(http-server:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(timeout 3 curl -I http://localhost:8000)"
     ],
     "deny": [],
     "ask": []

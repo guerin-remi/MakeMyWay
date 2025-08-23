@@ -115,7 +115,7 @@ export class PanelManager {
 
         // États du bottom sheet
         const states = {
-            collapsed: { height: '80px', class: 'collapsed' },
+            collapsed: { height: '180px', class: 'collapsed' },
             peek: { height: '30vh', class: 'peek' },
             half: { height: '50vh', class: 'half' },
             full: { height: '85vh', class: 'full' }

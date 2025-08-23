@@ -28,14 +28,14 @@ export class MapManager {
             throw new Error('Google Maps API n\'est pas chargée');
         }
 
-        const mapContainer = document.getElementById(containerId);
-        if (!mapContainer) {
+        this.mapContainer = document.getElementById(containerId);
+        if (!this.mapContainer) {
             throw new Error(`Conteneur de carte non trouvé: ${containerId}`);
         }
 
         try {
             // Créer la carte Google Maps avec interface épurée
-            this.map = new google.maps.Map(mapContainer, {
+            this.map = new google.maps.Map(this.mapContainer, {
                 center: { 
                     lat: CONFIG.MAP.DEFAULT_CENTER[0], 
                     lng: CONFIG.MAP.DEFAULT_CENTER[1] 
@@ -74,7 +74,7 @@ export class MapManager {
             // Configurer les événements
             this.setupMapEvents();
             
-            console.log('🗺️ Carte Google Maps initialisée');
+            console.log('[MAP] Carte Google Maps initialisée');
 
             // Initialiser le Places Service dans ApiService si disponible
             if (this.apiService && this.apiService.initializePlacesService) {
@@ -104,11 +104,12 @@ export class MapManager {
             }
         });
 
-        // Événements de redimensionnement (pas nécessaire avec Google Maps, il s'adapte automatiquement)
-        // Mais on garde pour compatibilité
-        google.maps.event.addListener(this.map, 'resize', () => {
-            // Google Maps gère le redimensionnement automatiquement
-            console.log('🔄 Redimensionnement de la carte détecté');
+        // Événement de redimensionnement de fenêtre seulement
+        window.addEventListener('resize', () => {
+            // Déclencher le redimensionnement de Google Maps
+            setTimeout(() => {
+                google.maps.event.trigger(this.map, 'resize');
+            }, 100);
         });
     }
 
@@ -601,7 +602,8 @@ export class MapManager {
      * Toggle plein écran
      */
     toggleFullscreen() {
-        const container = this.map.getContainer().parentElement;
+        // Utiliser la référence du conteneur DOM stockée lors de l'initialisation
+        const container = this.mapContainer;
         
         if (!document.fullscreenElement) {
             container.requestFullscreen?.() || 
@@ -653,8 +655,8 @@ export class MapManager {
     getMapCenter() {
         const center = this.map.getCenter();
         return {
-            lat: center.lat,
-            lng: center.lng
+            lat: center.lat(),
+            lng: center.lng()
         };
     }
 

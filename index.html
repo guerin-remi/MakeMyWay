@@ -36,14 +36,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="MakeMyWay">
     
-    <!-- Theme Color -->
-    <meta name="theme-color" content="#6366f1">
+    <!-- Theme Color déjà défini plus haut, suppression du doublon -->
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     
     <!-- Styles CSS modulaires -->
     <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/components/floating-search.css">
     <link rel="stylesheet" href="assets/css/components/panel.css">
     <link rel="stylesheet" href="assets/css/components/main-controls.css">
     <link rel="stylesheet" href="assets/css/components/map.css">
@@ -76,15 +76,26 @@
             </div>
         </header>
 
-        <!-- Panel principal flottant -->
-        <div class="main-panel" id="mainPanel">
-            <div class="panel-handle"></div>
-            <div class="panel-header">
-                <h2 class="panel-title">
-                    <i class="fas fa-route"></i>
-                    Configuration du parcours
-                </h2>
+        <!-- Barre de recherche flottante -->
+        <div class="floating-search-container">
+            <div class="search-pill" id="searchPill">
+                <i class="fas fa-search search-pill-icon"></i>
+                <input type="text" 
+                       id="destinationSearch" 
+                       class="search-pill-input" 
+                       placeholder="Où souhaitez-vous aller ?" 
+                       autocomplete="street-address"
+                       aria-label="Recherche d'un lieu">
+                <div id="searchSuggestions" class="search-suggestions"></div>
             </div>
+            <button id="geoLocationBtn" class="floating-geolocation-btn" type="button" aria-label="Se géolocaliser">
+                <i class="fas fa-crosshairs"></i>
+            </button>
+        </div>
+
+        <!-- Panel de configuration complet (apparaît depuis la barre de recherche) -->
+        <div class="main-panel collapsed" id="mainPanel">
+            <div class="panel-handle"></div>
             
             <div class="panel-content">
                 <div class="panel-scrollable">
@@ -210,7 +221,7 @@
                     </div>
                 </div>
 
-                <!-- Ancien accordéon caché par défaut -->
+                <!-- Accordéon des options avancées -->
                 <div class="accordion-section" style="display: none;">
                     <button class="accordion-header">
                         <div class="accordion-title">
@@ -299,13 +310,8 @@
         </div>
 
 
-        <!-- FAB secondaire pour reset (apparaît après génération) -->
-        <button class="fab-reset" id="resetBtn" style="display: none;" aria-label="Recommencer">
-            <i class="fas fa-redo"></i>
-        </button>
-
-        <!-- Panel d'aide -->
-        <div class="help-panel" id="helpPanel">
+        <!-- Éléments requis pour les fonctionnalités -->
+        <div id="helpPanel" class="help-panel" style="display: none;">
             <div class="help-header">
                 <h3 class="help-title">
                     <i class="fas fa-lightbulb"></i>
@@ -315,48 +321,15 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
-            <div class="help-tips">
-                <div class="help-tip">
-                    <i class="fas fa-mouse-pointer"></i>
-                    <span><strong>Cliquer</strong> sur la carte pour placer les points de départ et d'arrivée</span>
-                </div>
-                <div class="help-tip">
-                    <i class="fas fa-hand-rock"></i>
-                    <span><strong>Glisser-déposer</strong> les marqueurs pour les repositionner</span>
-                </div>
-                <div class="help-tip">
-                    <i class="fas fa-mouse"></i>
-                    <span><strong>Clic droit</strong> sur un marqueur pour le supprimer</span>
-                </div>
-                <div class="help-tip">
-                    <i class="fas fa-cog"></i>
-                    <span><strong>Bouton paramètres</strong> pour ouvrir la configuration du parcours</span>
-                </div>
-                <div class="help-tip">
-                    <i class="fas fa-crosshairs"></i>
-                    <span><strong>Géolocalisation</strong> pour utiliser votre position actuelle</span>
-                </div>
-                <div class="help-tip">
-                    <i class="fas fa-star"></i>
-                    <span><strong>Points d'intérêt</strong> pour enrichir votre parcours</span>
-                </div>
-            </div>
         </div>
 
-
-        <!-- Panel de résultats -->
-        <div class="results-panel" id="resultsPanel">
+        <div id="resultsPanel" class="results-panel" style="display: none;">
             <div class="results-header">
-                <div style="display: flex; align-items: center; gap: var(--space-3);">
-                    <i class="fas fa-check-circle"></i>
-                    <span>Parcours généré !</span>
-                </div>
-                <button class="results-close" id="closeResults" title="Fermer">
+                <span>Résultats</span>
+                <button class="results-close" id="closeResults">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
             <div class="results-grid">
                 <div class="result-stat">
                     <span class="stat-value" id="distanceResult">-</span>
@@ -371,20 +344,29 @@
                     <span class="stat-label">Écart</span>
                 </div>
             </div>
-            
             <button class="btn btn-primary btn-full" id="exportBtn">
                 <i class="fas fa-download"></i>
                 Exporter GPX
             </button>
         </div>
 
-        <!-- Loading overlay -->
-        <div class="loading-overlay" id="loadingOverlay">
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
             <div class="loading-content">
                 <i class="fas fa-spinner loading-spinner"></i>
-                <p>Génération du parcours en cours...</p>
+                <p>Chargement...</p>
             </div>
         </div>
+
+        <button id="resetBtn" class="fab-reset" style="display: none;">
+            <i class="fas fa-redo"></i>
+        </button>
+
+        <!-- Conteneurs requis pour l'autocomplétion -->
+        <div id="startAddressSuggestions" class="suggestion-container"></div>
+        <div id="endAddressSuggestions" class="suggestion-container"></div>
+        <div id="poiSuggestions" class="suggestion-container"></div>
+
+        <!-- Toast container pour les messages (géré via JS) -->
 
         <!-- Modal de connexion -->
         <div class="modal-overlay" id="loginModal">

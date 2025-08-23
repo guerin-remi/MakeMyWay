@@ -557,12 +557,24 @@ export class UIManager {
      * Gère la géolocalisation via le bouton moderne
      */
     async handleGeolocation() {
-        const geoBtn = this.elements.geoLocationBtn;
+        // Gérer les deux boutons potentiels
+        const geoBtn = this.elements.geoLocationBtn || document.getElementById('geoLocationBtnCollapsed');
         
         try {
+            console.log('🎯 Demande de géolocalisation...');
+            
             // État de chargement du bouton
             if (geoBtn) {
                 geoBtn.classList.add('loading');
+                const icon = geoBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-spinner fa-spin';
+                }
+            }
+            
+            // Vérifier le support de la géolocalisation
+            if (!navigator.geolocation) {
+                throw new Error('La géolocalisation n\'est pas supportée par votre navigateur');
             }
             
             const position = await this.mapManager.getCurrentPosition();
@@ -573,29 +585,68 @@ export class UIManager {
             if (geoBtn) {
                 geoBtn.classList.remove('loading');
                 geoBtn.classList.add('success');
+                const icon = geoBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-check';
+                }
                 setTimeout(() => {
                     geoBtn.classList.remove('success');
-                }, 1000);
+                    if (icon) {
+                        icon.className = 'fas fa-crosshairs';
+                    }
+                }, 2000);
             }
             
-            console.log('🎯 Position obtenue via bouton géolocalisation:', position);
+            // Feedback de succès
+            if (this.routeFeedback) {
+                this.routeFeedback.showToast(
+                    'Position obtenue avec succès !',
+                    'success'
+                );
+            }
+            
+            console.log('✅ Position obtenue via géolocalisation:', position);
             
         } catch (error) {
-            console.error('Erreur géolocalisation:', error);
+            console.error('❌ Erreur géolocalisation:', error);
             
             // Retirer l'état de chargement
             if (geoBtn) {
                 geoBtn.classList.remove('loading');
+                geoBtn.classList.add('error');
+                const icon = geoBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-exclamation-triangle';
+                }
+                setTimeout(() => {
+                    geoBtn.classList.remove('error');
+                    if (icon) {
+                        icon.className = 'fas fa-crosshairs';
+                    }
+                }, 3000);
+            }
+            
+            // Messages d'erreur personnalisés selon le code d'erreur
+            let errorMessage = 'Impossible d\'obtenir votre position';
+            if (error.code) {
+                switch (error.code) {
+                    case 1: // PERMISSION_DENIED
+                        errorMessage = 'Accès à la localisation refusé. Veuillez autoriser la géolocalisation dans votre navigateur.';
+                        break;
+                    case 2: // POSITION_UNAVAILABLE
+                        errorMessage = 'Position indisponible. Vérifiez votre connexion GPS.';
+                        break;
+                    case 3: // TIMEOUT
+                        errorMessage = 'Délai de localisation dépassé. Réessayez.';
+                        break;
+                }
             }
             
             // Feedback d'erreur
             if (this.routeFeedback) {
-                this.routeFeedback.showToast(
-                    error.message || 'Impossible d\'obtenir votre position', 
-                    'error'
-                );
+                this.routeFeedback.showToast(errorMessage, 'error');
             } else {
-                this.showError(error.message);
+                this.showError(errorMessage);
             }
         }
     }

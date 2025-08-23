@@ -8,6 +8,7 @@ import { ApiService } from './modules/ApiService.js';
 import { MapManager } from './modules/MapManager.js';
 import { RouteGenerator } from './modules/RouteGenerator.js';
 import { UIManager } from './modules/UIManager.js';
+import { FloatingSearchManager } from './modules/FloatingSearchManager.js';
 import { AuthUI } from './modules/AuthUI.js';
 
 /**
@@ -163,12 +164,13 @@ class MakeMyWayApp {
     }
 
     /**
-     * Initialise l'interface utilisateur
+     * Initialise l'interface utilisateur hybride
      * @private
      */
     async _initializeUI() {
-        console.log('🎨 Initialisation de l\'interface...');
+        console.log('🎨 Initialisation de l\'interface hybride...');
         
+        // 1. Initialiser l'UIManager pour les fonctionnalités de base
         this.modules.uiManager = new UIManager(
             this.modules.apiService,
             this.modules.mapManager,
@@ -178,10 +180,19 @@ class MakeMyWayApp {
         
         await this.modules.uiManager.initialize();
         
-        // Rendre l'uiManager disponible globalement pour le feedback
-        window.uiManager = this.modules.uiManager;
+        // 2. Initialiser le système de recherche flottant
+        this.modules.floatingSearchManager = new FloatingSearchManager(
+            this.modules.apiService,
+            this.modules.mapManager
+        );
         
-        console.log('✅ UIManager initialisé');
+        await this.modules.floatingSearchManager.initialize();
+        
+        // Rendre les managers disponibles globalement
+        window.uiManager = this.modules.uiManager;
+        window.floatingSearchManager = this.modules.floatingSearchManager;
+        
+        console.log('✅ Interface hybride initialisée');
     }
 
     /**
@@ -194,7 +205,7 @@ class MakeMyWayApp {
         // Connecter l'UI Manager avec le Map Manager pour les callbacks
         this.modules.uiManager.setupMapCallbacks();
         
-        console.log('✅ Modules connectés');
+        console.log('✅ Modules connectés (architecture hybride)');
     }
 
     /**

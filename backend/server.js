@@ -23,8 +23,7 @@ app.use(cors({
             'http://127.0.0.1:5500', 
             'http://localhost:8000',
             'http://127.0.0.1:8000',
-            'https://guerin-remi.github.io',
-            'https://guerin-remi.github.io/MakeMyWay',
+            'https://guerin-remi.github.io', // Origin correct sans chemin
             process.env.FRONTEND_URL
         ].filter(Boolean);
         
@@ -46,6 +45,12 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Headers pour l'encodage UTF-8
+app.use((req, res, next) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    next();
+});
 
 // Connexion à MongoDB
 const connectDB = async () => {
