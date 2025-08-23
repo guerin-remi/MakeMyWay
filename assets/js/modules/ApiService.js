@@ -577,6 +577,98 @@ export class ApiService {
     }
 
     /**
+     * Recherche des lieux via l'API Google Places Autocomplete
+     * @param {string} query - Requête de recherche
+     * @param {Object} options - Options de recherche
+     * @returns {Promise<Array>} Liste des suggestions
+     */
+    async searchPlaces(query, options = {}) {
+        if (!query || query.length < 3) {
+            return [];
+        }
+
+        try {
+            // Si l'autocomplete service n'est pas initialisé
+            if (!this.autocompleteService && google?.maps?.places) {
+                this.autocompleteService = new google.maps.places.AutocompleteService();
+            }
+
+            if (!this.autocompleteService) {
+                console.warn('⚠️ AutocompleteService non disponible');
+                return [];
+            }
+
+            return new Promise((resolve, reject) => {
+                const request = {
+                    input: query,
+                    componentRestrictions: { country: 'fr' },
+                    ...options
+                };
+
+                this.autocompleteService.getPlacePredictions(request, (predictions, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                        // Formater les prédictions pour l'UI
+                        const results = predictions.map(prediction => ({
+                            place_id: prediction.place_id,
+                            name: prediction.structured_formatting.main_text,
+                            address: prediction.structured_formatting.secondary_text || '',
+                            description: prediction.description
+                        }));
+                        resolve(results);
+                    } else {
+                        console.warn('Aucune suggestion trouvée:', status);
+                        resolve([]);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('❌ Erreur lors de la recherche de lieux:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Obtient les détails d'un lieu par son place_id
+     * @param {string} placeId - ID du lieu Google
+     * @returns {Promise<Object>} Détails du lieu avec géométrie
+     */
+    async getPlaceDetails(placeId) {
+        if (!placeId) return null;
+
+        try {
+            // Utiliser le geocoder pour obtenir les détails avec coordonnées
+            if (!this.geocoder) {
+                console.warn('⚠️ Geocoder non disponible');
+                return null;
+            }
+
+            return new Promise((resolve, reject) => {
+                this.geocoder.geocode({ placeId: placeId }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        const result = results[0];
+                        resolve({
+                            place_id: placeId,
+                            name: result.formatted_address,
+                            geometry: {
+                                location: {
+                                    lat: result.geometry.location.lat(),
+                                    lng: result.geometry.location.lng()
+                                }
+                            }
+                        });
+                    } else {
+                        console.warn('Détails du lieu non trouvés:', status);
+                        resolve(null);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération des détails:', error);
+            return null;
+        }
+    }
+
+    /**
      * Vérifie si les services Google Maps sont disponibles
      * @returns {Object} État des services
      */
@@ -585,6 +677,7 @@ export class ApiService {
             directionsService: !!this.directionsService,
             geocoder: !!this.geocoder,
             placesService: !!this.placesService,
+            autocompleteService: !!this.autocompleteService,
             googleMapsLoaded: !!(typeof google !== 'undefined' && google.maps)
         };
     }

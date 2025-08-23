@@ -9,6 +9,7 @@ import { MapManager } from './modules/MapManager.js';
 import { RouteGenerator } from './modules/RouteGenerator.js';
 import { UIManager } from './modules/UIManager.js';
 import { FloatingSearchManager } from './modules/FloatingSearchManager.js';
+import { CityMapperBottomSheet } from './modules/CityMapperBottomSheet.js';
 import { AuthUI } from './modules/AuthUI.js';
 
 /**
@@ -180,19 +181,32 @@ class MakeMyWayApp {
         
         await this.modules.uiManager.initialize();
         
-        // 2. Initialiser le système de recherche flottant
+        // 2. NOUVEAU: Initialiser le Bottom Sheet CityMapper (priorité mobile)
+        this.modules.cityMapperSheet = new CityMapperBottomSheet(
+            this.modules.apiService,
+            this.modules.mapManager,
+            this.modules.uiManager
+        );
+        
+        await this.modules.cityMapperSheet.initialize();
+        
+        // 3. Initialiser le système de recherche flottant (désactivé si CityMapper actif)
+        // Commenté pour donner la priorité au nouveau bottom sheet
+        /*
         this.modules.floatingSearchManager = new FloatingSearchManager(
             this.modules.apiService,
             this.modules.mapManager
         );
         
         await this.modules.floatingSearchManager.initialize();
+        */
         
         // Rendre les managers disponibles globalement
         window.uiManager = this.modules.uiManager;
-        window.floatingSearchManager = this.modules.floatingSearchManager;
+        window.cityMapperSheet = this.modules.cityMapperSheet;
+        // window.floatingSearchManager = this.modules.floatingSearchManager;
         
-        console.log('✅ Interface hybride initialisée');
+        console.log('✅ Interface hybride avec Bottom Sheet CityMapper initialisée');
     }
 
     /**
@@ -299,7 +313,7 @@ class MakeMyWayApp {
             align-items: center;
             justify-content: center;
             z-index: 10000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             padding: 2rem;
         `;
         
