@@ -775,7 +775,7 @@ export class UIManager {
     exportGPX() {
         const routeData = this.routeGenerator.getLastRoute();
         if (!routeData || !routeData.route || routeData.route.length === 0) {
-            this.showError('Aucun parcours à exporter');
+            this.showError('Aucun parcours a exporter');
             return;
         }
 
@@ -795,7 +795,7 @@ export class UIManager {
 
         } catch (error) {
             console.error('Erreur export GPX:', error);
-            this.showError('Erreur lors de l\'export GPX');
+            this.showError('Erreur lors de l export GPX');
         }
     }
 
@@ -1074,8 +1074,8 @@ export class UIManager {
                     matchingInput.dispatchEvent(new Event('change'));
                 }
                 
-                // Mettre à jour l'état
-                this.handleModeChange(mode);
+                // Mettre à jour l'état via FormManager
+                this.formManager.handleModeChange(mode);
                 
                 console.log(`Mode sélectionné: ${mode}`);
             });

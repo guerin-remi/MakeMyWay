@@ -172,8 +172,9 @@ export class FormManager {
             // Délai pour éviter trop de requêtes
             const timeoutId = setTimeout(async () => {
                 try {
-                    const suggestions = await this.apiService.searchAddresses(query);
-                    this.showAddressSuggestions(suggestions, suggestionsContainer, input, type);
+                    // Méthode searchAddresses n'existe pas dans ApiService, désactiver cette fonctionnalité
+                    console.warn('searchAddresses non implémentée dans ApiService');
+                    this.hideSuggestions(suggestionsContainer);
                 } catch (error) {
                     console.error('Erreur recherche adresses:', error);
                     this.hideSuggestions(suggestionsContainer);

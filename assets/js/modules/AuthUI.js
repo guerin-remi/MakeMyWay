@@ -14,9 +14,9 @@ export class AuthUI {
      * Initialise les références aux éléments DOM
      */
     initializeElements() {
-        // Bouton utilisateur
-        this.userBtn = document.getElementById('userBtn');
-        this.userBtnText = document.getElementById('userBtnText');
+        // Bouton utilisateur (éléments non présents dans l'HTML actuel)
+        this.userBtn = document.getElementById('userBtn') || null;
+        this.userBtnText = document.getElementById('userBtnText') || null;
         
         // Modales
         this.loginModal = document.getElementById('loginModal');

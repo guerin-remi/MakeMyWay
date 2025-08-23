@@ -2,16 +2,16 @@
    MakeMyWay - Composants de recherche flottants
    ========================================================================== */
 
-/* Container principal flottant */
+/* Container principal flottant - Optimisé mobile */
 .floating-search-container {
     position: fixed;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-    left: calc(env(safe-area-inset-left, 0px) + 16px);
-    right: calc(env(safe-area-inset-right, 0px) + 16px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    left: calc(env(safe-area-inset-left, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
     z-index: 1000;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px; /* Réduit pour mobile */
     pointer-events: none; /* Permet les interactions avec la carte derrière */
     
     /* Support des notch et safe areas iPhone */
@@ -20,32 +20,44 @@
     padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Barre de recherche pill */
+/* Barre de recherche pill - Taille mobile optimisée */
 .search-pill {
     flex: 1;
     position: relative;
     background: white;
-    border: 2px solid transparent;
-    border-radius: 32px;
-    padding: 14px 20px;
+    border: 1px solid transparent;
+    border-radius: 22px; /* Réduit pour mobile */
+    padding: 10px 16px; /* Réduit pour mobile */
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px; /* Réduit */
     box-shadow: 
-        0 4px 20px rgba(0, 0, 0, 0.1),
-        0 8px 40px rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        0 2px 12px rgba(0, 0, 0, 0.08),
+        0 4px 24px rgba(0, 0, 0, 0.04);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     pointer-events: all; /* Réactive les interactions sur la pill */
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    height: 44px; /* Hauteur fixe pour alignement avec bouton géo */
+    min-height: 44px; /* Respecte les guidelines tactiles */
 }
 
+/* État focus avec animation de pre-ouverture */
 .search-pill:focus-within {
     border-color: var(--primary, #6366f1);
     box-shadow: 
-        0 6px 24px rgba(99, 102, 241, 0.15),
-        0 12px 48px rgba(99, 102, 241, 0.1);
-    transform: translateY(-2px);
+        0 4px 20px rgba(99, 102, 241, 0.12),
+        0 8px 32px rgba(99, 102, 241, 0.08);
+    transform: translateY(-1px) scale(1.02);
+}
+
+/* Animation pré-ouverture quand la modale va s'ouvrir */
+.search-pill.opening {
+    transform: translateY(-2px) scale(1.03);
+    border-color: var(--primary, #6366f1);
+    box-shadow: 
+        0 6px 24px rgba(99, 102, 241, 0.2),
+        0 12px 48px rgba(99, 102, 241, 0.15);
 }
 
 .search-pill:hover:not(:focus-within) {
@@ -84,30 +96,32 @@
     font-weight: 400;
 }
 
-/* Bouton de géolocalisation circulaire */
+/* Bouton de géolocalisation circulaire - Harmonisé avec search pill */
 .floating-geolocation-btn {
-    width: 56px;
-    height: 56px;
+    width: 44px; /* Même hauteur que search pill */
+    height: 44px;
     background: white;
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-shadow: 
-        0 4px 20px rgba(0, 0, 0, 0.1),
-        0 8px 40px rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        0 2px 12px rgba(0, 0, 0, 0.08),
+        0 4px 24px rgba(0, 0, 0, 0.04);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     pointer-events: all;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     flex-shrink: 0;
+    min-width: 44px; /* Zone tactile minimale */
+    min-height: 44px;
 }
 
 .floating-geolocation-btn i {
     color: var(--primary, #6366f1);
-    font-size: 1.3rem;
+    font-size: 1.1rem; /* Réduit pour correspondre à la taille du bouton */
     transition: all 0.3s ease;
 }
 
@@ -317,17 +331,20 @@
     }
 }
 
-/* Responsive */
-@media (max-width: 480px) {
+/* Optimisations mobiles - Design mobile-first */
+/* Les styles de base sont déjà optimisés mobile */
+
+/* Très petits écrans (iPhone SE, etc.) */
+@media (max-width: 375px) {
     .floating-search-container {
-        left: 12px;
-        right: 12px;
-        gap: 8px;
+        left: 8px;
+        right: 8px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
     }
     
     .search-pill {
-        padding: 12px 16px;
-        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 20px;
     }
     
     .search-pill-input {
@@ -335,12 +352,29 @@
     }
     
     .floating-geolocation-btn {
-        width: 52px;
-        height: 52px;
+        width: 42px;
+        height: 42px;
     }
     
     .floating-geolocation-btn i {
-        font-size: 1.2rem;
+        font-size: 1rem;
+    }
+}
+
+/* Grands écrans mobiles et phablets */
+@media (min-width: 376px) and (max-width: 480px) {
+    .floating-search-container {
+        gap: 10px;
+    }
+    
+    .search-pill {
+        height: 46px;
+        padding: 11px 17px;
+    }
+    
+    .floating-geolocation-btn {
+        width: 46px;
+        height: 46px;
     }
 }
 
@@ -369,31 +403,93 @@
     }
 }
 
-/* Zones tactiles minimales (accessibilité) */
+/* Optimisations tactiles mobiles */
 @media (pointer: coarse) {
+    /* Assurer les zones tactiles minimales */
     .floating-geolocation-btn {
-        min-width: 48px;
-        min-height: 48px;
+        min-width: 44px;
+        min-height: 44px;
+        /* Touch target padding virtuel */
+        position: relative;
+    }
+    
+    .floating-geolocation-btn::before {
+        content: '';
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        right: -4px;
+        bottom: -4px;
+        z-index: -1;
+    }
+    
+    .search-pill-input {
+        min-height: 44px;
+        touch-action: manipulation; /* Optimise les interactions tactiles */
     }
     
     .search-suggestion-item {
         min-height: 48px;
-        padding: 12px 20px;
+        padding: 14px 20px;
+        touch-action: manipulation;
+    }
+    
+    /* Amélioration des interactions tactiles */
+    .search-pill:active {
+        transform: translateY(-1px) scale(1.01);
+        transition: transform 0.1s ease;
+    }
+    
+    .floating-geolocation-btn:active {
+        transform: scale(0.95);
+        transition: transform 0.1s ease;
     }
 }
 
-/* Le panneau principal reste fonctionnel mais s'ouvre depuis la barre flottante */
+/* Animation fluide de la modale depuis la search pill */
 .main-panel.collapsed {
     transform: translateY(100%);
     opacity: 0;
     pointer-events: none;
-    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
 }
 
 .main-panel.show {
     transform: translateY(0);
     opacity: 1;
     pointer-events: all;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Animation d'ouverture en plusieurs étapes */
+.main-panel.opening {
+    animation: modalSlideUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes modalSlideUp {
+    0% {
+        transform: translateY(100%);
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    30% {
+        transform: translateY(50%);
+        opacity: 0.3;
+        backdrop-filter: blur(2px);
+    }
+    60% {
+        transform: translateY(10%);
+        opacity: 0.8;
+        backdrop-filter: blur(6px);
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+        backdrop-filter: blur(8px);
+    }
 }
 
 /* Quand le panneau flottant est actif, masquer la barre de recherche du panneau */

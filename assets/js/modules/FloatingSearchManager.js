@@ -61,20 +61,49 @@ export class FloatingSearchManager {
             geoLocationBtn: !!this.elements.geoLocationBtn,
             searchSuggestions: !!this.elements.searchSuggestions
         });
+        
+        // Log détaillé des éléments HTML
+        console.log('📋 FLOATING: floating-search-container:', !!document.querySelector('.floating-search-container'));
+        console.log('📋 FLOATING: search-pill:', !!document.querySelector('.search-pill'));  
+        console.log('📋 FLOATING: destinationSearch input:', !!document.getElementById('destinationSearch'));
+        console.log('📋 PANEL: search-component-container:', !!document.querySelector('.search-component-container'));
+        console.log('📋 PANEL: destinationAddress input:', !!document.getElementById('destinationAddress'));
     }
 
     /**
      * Configure les écouteurs d'événements
      */
     setupEventListeners() {
-        // Recherche de lieu
+        console.log('🎧 Configuration des event listeners FloatingSearch...');
+        
+        // Recherche de lieu avec optimisations tactiles
         if (this.elements.destinationSearch) {
+            console.log('🎧 Ajout listener INPUT sur destinationSearch');
             this.elements.destinationSearch.addEventListener('input', (e) => {
+                console.log('🎧 INPUT EVENT déclenché sur destinationSearch:', e.target.value);
                 this.handleSearchInput(e.target.value);
             });
 
-            this.elements.destinationSearch.addEventListener('focus', () => {
-                this.handleSearchFocus();
+            // MOBILE-FIRST : laisser taper dans l'input flottant
+            console.log('🎧 Ajout listeners MOBILE sur destinationSearch');
+            
+            // NE PAS ouvrir au touchstart - laisser l'utilisateur taper
+            this.elements.destinationSearch.addEventListener('touchstart', (e) => {
+                console.log('🎧 TOUCHSTART sur destinationSearch - pas d\'ouverture automatique');
+                e.stopPropagation();
+                // Pas d'appel à handleSearchFocus() - on laisse taper
+            }, { passive: false });
+            
+            // Focus : NE PAS ouvrir automatiquement 
+            this.elements.destinationSearch.addEventListener('focus', (e) => {
+                console.log('🎧 FOCUS EVENT sur destinationSearch - pas d\'ouverture auto');
+                // Pas d'ouverture automatique - on laisse l'utilisateur taper
+            });
+            
+            // Click en backup
+            this.elements.destinationSearch.addEventListener('click', (e) => {
+                console.log('🎧 CLICK sur destinationSearch - arrêt propagation');
+                e.stopPropagation();
             });
 
             this.elements.destinationSearch.addEventListener('blur', () => {
@@ -90,6 +119,35 @@ export class FloatingSearchManager {
             });
         }
 
+        // Gestionnaire tactile pour la search pill elle-même
+        if (this.elements.searchPill) {
+            console.log('🎧 Ajout listener CLICK sur searchPill');
+            // MOBILE : touchstart sur searchPill
+            this.elements.searchPill.addEventListener('touchstart', (e) => {
+                console.log('🎧 TOUCHSTART sur searchPill, target:', e.target.tagName, e.target.className);
+                e.stopPropagation();
+                
+                // Si ce n'est pas l'input, déclencher directement l'ouverture
+                if (e.target !== this.elements.destinationSearch) {
+                    console.log('🎧 Ouverture directe depuis searchPill touchstart');
+                    this.handleSearchFocus();
+                }
+            }, { passive: false });
+            
+            // Backup click pour desktop
+            this.elements.searchPill.addEventListener('click', (e) => {
+                console.log('🎧 CLICK EVENT sur searchPill, target:', e.target.tagName, e.target.className);
+                e.stopPropagation();
+                
+                if (e.target !== this.elements.destinationSearch) {
+                    const mainPanel = document.getElementById('mainPanel');
+                    if (!mainPanel?.classList.contains('show')) {
+                        this.handleSearchFocus();
+                    }
+                }
+            });
+        }
+
         // Géolocalisation
         if (this.elements.geoLocationBtn) {
             this.elements.geoLocationBtn.addEventListener('click', () => {
@@ -97,18 +155,32 @@ export class FloatingSearchManager {
             });
         }
 
-        // Fermeture des suggestions au clic extérieur
-        document.addEventListener('click', (e) => {
+        // MOBILE : touchstart global pour fermeture (au lieu de click)
+        document.addEventListener('touchstart', (e) => {
+            console.log('🎧 TOUCHSTART GLOBAL sur', e.target.tagName, e.target.className);
+            
             if (!this.elements.searchPill?.contains(e.target)) {
                 this.hideSuggestions();
             }
             
-            // Fermer le panneau principal si on clique en dehors
+            // Fermer le panneau principal si touch en dehors
             const mainPanel = document.getElementById('mainPanel');
-            if (mainPanel && !mainPanel.contains(e.target) && !this.elements.searchPill?.contains(e.target)) {
+            const isOutsidePanel = mainPanel && !mainPanel.contains(e.target);
+            const isOutsideSearchPill = !this.elements.searchPill?.contains(e.target);
+            
+            console.log('🎧 Touch analysis:', {
+                mainPanel: !!mainPanel,
+                outsidePanel: isOutsidePanel,
+                outsideSearchPill: isOutsideSearchPill,
+                panelHasShow: mainPanel?.classList.contains('show'),
+                shouldClose: isOutsidePanel && isOutsideSearchPill && mainPanel?.classList.contains('show')
+            });
+            
+            if (isOutsidePanel && isOutsideSearchPill && mainPanel?.classList.contains('show')) {
+                console.log('🎧 FERMETURE du panneau par touchstart global');
                 this.hideMainPanel();
             }
-        });
+        }, { passive: true });
 
         console.log('✅ Event listeners configurés');
     }
@@ -132,15 +204,23 @@ export class FloatingSearchManager {
      */
     async handleSearchInput(query) {
         const trimmedQuery = query.trim();
+        console.log('🔍 handleSearchInput:', trimmedQuery, 'longueur:', trimmedQuery.length);
         
         // Annuler la recherche précédente
         if (this.searchTimeout) {
             clearTimeout(this.searchTimeout);
         }
 
-        if (trimmedQuery.length < CONFIG.POI?.MIN_QUERY_LENGTH || 3) {
+        if (trimmedQuery.length < 3) {
             this.hideSuggestions();
             return;
+        }
+
+        // MOBILE: Ouvrir le panneau seulement quand on commence à taper vraiment
+        const mainPanel = document.getElementById('mainPanel');
+        if (!mainPanel?.classList.contains('show')) {
+            console.log('🔍 Ouverture panneau car recherche démarrée');
+            this.showMainPanel();
         }
 
         // Debounce pour éviter trop de requêtes
@@ -485,6 +565,17 @@ export class FloatingSearchManager {
      * Gère le focus sur la recherche
      */
     handleSearchFocus() {
+        console.log('🔍 handleSearchFocus appelé - Stack trace:', new Error().stack);
+        
+        // Vérifier si le panneau est déjà ouvert
+        const mainPanel = document.getElementById('mainPanel');
+        const isAlreadyOpen = mainPanel && mainPanel.classList.contains('show');
+        
+        if (isAlreadyOpen) {
+            console.log('📱 Panneau déjà ouvert, éviter la duplication');
+            return;
+        }
+        
         const query = this.elements.destinationSearch?.value?.trim();
         if (query && query.length >= 3) {
             this.handleSearchInput(query);
@@ -497,16 +588,24 @@ export class FloatingSearchManager {
     }
 
     /**
-     * Affiche le panneau principal de configuration
+     * Affiche le panneau principal de configuration avec animation fluide
      */
     showMainPanel() {
         const mainPanel = document.getElementById('mainPanel');
+        const searchPill = this.elements.searchPill;
+        
+        if (mainPanel && mainPanel.classList.contains('show')) {
+            console.log('📱 Panneau déjà ouvert, éviter la duplication');
+            return;
+        }
+        
         if (mainPanel) {
+            // Animation simple : directement à l'état final
             mainPanel.classList.remove('collapsed');
             mainPanel.classList.add('show');
             document.body.classList.add('floating-search-active');
             
-            console.log('📱 Panneau principal ouvert depuis la recherche flottante');
+            console.log('📱 Panneau principal ouvert avec animation fluide');
         }
     }
 

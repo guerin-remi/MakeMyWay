@@ -509,28 +509,39 @@ export class ApiService {
      */
     getPOITypeIcon(type) {
         const icons = {
-            // Types Google Places
-            'tourist_attraction': '🎯',
-            'museum': '🏛️',
-            'park': '🌳',
-            'restaurant': '🍽️',
-            'cafe': '☕',
-            'shopping_mall': '🛒',
-            'store': '🛍️',
-            'church': '⛪',
-            'stadium': '🏟️',
-            'gym': '🏋️',
-            'amusement_park': '🎢',
-            'zoo': '🦁',
-            'aquarium': '🐠',
-            'library': '📚',
-            'hospital': '🏥',
-            'pharmacy': '💊',
-            'bank': '🏦',
-            'gas_station': '⛽',
+            // Types Google Places - Fallback texte si problème d'encodage
+            'tourist_attraction': 'SITE',
+            'museum': 'MUSEE',
+            'park': 'PARC',
+            'restaurant': 'RESTO',
+            'cafe': 'CAFE',
+            'shopping_mall': 'SHOP',
+            'store': 'MAGASIN',
+            'church': 'EGLISE',
+            'stadium': 'STADE',
+            'gym': 'SPORT',
+            'amusement_park': 'PARC',
+            'zoo': 'ZOO',
+            'aquarium': 'AQUA',
+            'library': 'BIBLIO',
+            'hospital': 'HOPITAL',
+            'pharmacy': 'PHARMA',
+            'bank': 'BANQUE',
+            'gas_station': 'ESSENCE',
+            'lodging': 'HOTEL',
+            'school': 'ECOLE',
+            'university': 'UNIV',
+            'courthouse': 'JUSTICE',
+            'post_office': 'POSTE',
+            'fire_station': 'POMPIER',
+            'police': 'POLICE',
+            'subway_station': 'METRO',
+            'bus_station': 'BUS',
+            'train_station': 'TRAIN',
+            'airport': 'AERO',
             // Fallbacks
-            'point_of_interest': '📍',
-            'default': '📍'
+            'point_of_interest': 'POI',
+            'default': 'POI'
         };
         return icons[type] || icons.default;
     }
