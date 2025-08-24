@@ -6,6 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "dev": "python -m http.server 8000",
     "dev:alt": "npx http-server -p 8000"
   },
