@@ -13,7 +13,8 @@ logs/
 *.tmp
 *.temp
 
-# Node modules (backend)
+# Node modules
+node_modules/
 backend/node_modules/
 backend/package-lock.json
 
@@ -29,6 +30,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Claude configuration locale
+.claude/settings.local.json
 
 # Test files
 test-*.html
