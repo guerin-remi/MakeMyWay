@@ -156,56 +156,6 @@ export class FormManager {
     }
 
     /**
-     * Configure l'autocomplétion pour un champ d'adresse
-     * @param {string} inputId - ID du champ de saisie
-     * @param {string} suggestionsId - ID du conteneur de suggestions
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    setupAddressAutocomplete(inputId, suggestionsId, type) {
-        const input = this.elements[inputId];
-        const suggestionsContainer = this.elements[suggestionsId];
-        
-        if (!input) return;
-
-        input.addEventListener('input', async (e) => {
-            const query = e.target.value.trim();
-            
-            // Annuler la recherche précédente
-            this.cancelSuggestionTimeout(inputId);
-            
-            if (query.length < 3) {
-                this.hideSuggestions(suggestionsContainer);
-                return;
-            }
-
-            // Délai pour éviter trop de requêtes
-            const timeoutId = setTimeout(async () => {
-                try {
-                    // Méthode searchAddresses n'existe pas dans ApiService, désactiver cette fonctionnalité
-                    console.warn('searchAddresses non implémentée dans ApiService');
-                    this.hideSuggestions(suggestionsContainer);
-                } catch (error) {
-                    console.error('Erreur recherche adresses:', error);
-                    this.hideSuggestions(suggestionsContainer);
-                }
-            }, CONFIG.POI.SEARCH_DELAY);
-
-            this.suggestions.timeouts.set(inputId, timeoutId);
-        });
-
-        // Masquer les suggestions lors de la perte de focus
-        input.addEventListener('blur', () => {
-            setTimeout(() => this.hideSuggestions(suggestionsContainer), CONFIG.UI.SUGGESTION_DELAY);
-        });
-
-        input.addEventListener('focus', () => {
-            if (input.value.length >= 3 && suggestionsContainer?.children.length > 0) {
-                suggestionsContainer.style.display = 'block';
-            }
-        });
-    }
-
-    /**
      * Configure l'autocomplétion pour les POI
      * @param {string} inputId - ID du champ de saisie POI
      * @param {string} suggestionsId - ID du conteneur de suggestions POI
@@ -244,50 +194,6 @@ export class FormManager {
         input.addEventListener('blur', () => {
             setTimeout(() => this.hideSuggestions(suggestionsContainer), CONFIG.UI.SUGGESTION_DELAY);
         });
-    }
-
-    /**
-     * Affiche les suggestions d'adresses
-     * @param {Array} suggestions - Liste des suggestions
-     * @param {HTMLElement} container - Conteneur des suggestions
-     * @param {HTMLInputElement} input - Champ de saisie
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    showAddressSuggestions(suggestions, container, input, type) {
-        if (!container) return;
-
-        container.innerHTML = '';
-        container.style.display = 'none';
-
-        if (suggestions.length === 0) {
-            const noResults = document.createElement('div');
-            noResults.className = 'suggestion-item';
-            noResults.textContent = 'Aucune adresse trouvée';
-            noResults.style.color = '#64748B';
-            container.appendChild(noResults);
-            container.style.display = 'block';
-            return;
-        }
-
-        suggestions.forEach(suggestion => {
-            const item = document.createElement('div');
-            item.className = 'suggestion-item';
-            item.innerHTML = `
-                <div style="font-weight: 500;">${this.apiService.formatAddressName(suggestion.display_name)}</div>
-                <div style="font-size: 0.8rem; color: #64748B; margin-top: 0.25rem;">
-                    ${this.apiService.getAddressDetails(suggestion.display_name)}
-                </div>
-            `;
-            
-            item.addEventListener('click', () => {
-                this.selectAddress(suggestion, input, type);
-                this.hideSuggestions(container);
-            });
-            
-            container.appendChild(item);
-        });
-
-        container.style.display = 'block';
     }
 
     /**
@@ -331,26 +237,6 @@ export class FormManager {
         });
 
         container.style.display = 'block';
-    }
-
-    /**
-     * Sélectionne une adresse depuis les suggestions
-     * @param {Object} suggestion - Suggestion d'adresse
-     * @param {HTMLInputElement} input - Champ de saisie
-     * @param {string} type - Type ('start' ou 'end')
-     */
-    selectAddress(suggestion, input, type) {
-        input.value = this.apiService.formatAddressName(suggestion.display_name);
-        
-        const latlng = { lat: suggestion.lat, lng: suggestion.lng };
-        
-        if (type === 'start') {
-            this.uiManager.setStartPoint(latlng);
-        } else if (type === 'end') {
-            this.uiManager.setEndPoint(latlng);
-        }
-        
-        console.log(`✅ ${type === 'start' ? 'Départ' : 'Arrivée'} défini:`, suggestion.display_name);
     }
 
     /**
