@@ -95,8 +95,17 @@ export class FormManager {
                 lng: location.lng()
             };
 
-            // Mettre à jour le point de départ via UIManager
-            this.uiManager.setStartPoint(coordinates);
+            // Utiliser updateDestination pour la synchronisation
+            if (this.uiManager.updateDestination) {
+                this.uiManager.updateDestination({
+                    text: place.formatted_address || place.name,
+                    coords: coordinates,
+                    source: 'panel'
+                });
+            } else {
+                // Fallback sur l'ancienne méthode
+                this.uiManager.setStartPoint(coordinates);
+            }
 
             console.log('📍 Point de départ défini via Google Places:', place.formatted_address);
         });

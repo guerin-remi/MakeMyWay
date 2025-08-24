@@ -94,6 +94,19 @@ export class MapManager {
     setupMapEvents() {
         // Clic sur la carte
         this.map.addListener('click', (e) => {
+            // Vérifier si un overlay est actif (CityMapperBottomSheet)
+            const mapOverlay = document.getElementById('mapOverlay');
+            if (mapOverlay && mapOverlay.classList.contains('show')) {
+                console.log('🚫 Clic Google Maps ignoré - Overlay actif');
+                return;
+            }
+            
+            // Vérifier si CityMapperBottomSheet est ouvert
+            if (window.cityMapperSheet && window.cityMapperSheet.state && window.cityMapperSheet.state.isOpen) {
+                console.log('🚫 Clic Google Maps ignoré - CityMapperBottomSheet ouvert');
+                return;
+            }
+            
             if (this.onMapClick) {
                 // Convertir au format attendu par l'application
                 const latlng = {

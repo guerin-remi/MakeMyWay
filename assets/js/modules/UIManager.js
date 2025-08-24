@@ -24,7 +24,10 @@ export class UIManager {
             returnToStart: false,
             isLoading: false,
             routeType: 'loop', // 'loop' ou 'oneway'
-            destinationSelected: false
+            destinationSelected: false,
+            // Source de vérité unique pour la destination
+            destinationText: '',
+            destinationCoords: null
         };
         
         // Gestionnaires seront initialisés après le cache des éléments
@@ -46,6 +49,7 @@ export class UIManager {
             this.formManager.setupAutocomplete();
             this.initializeControls();
             this.setupResponsiveHandlers();
+            this.setupMapCallbacks();
             
             console.log('🎨 Interface utilisateur initialisée');
             
@@ -53,6 +57,104 @@ export class UIManager {
             console.error('Erreur initialisation UI:', error);
             throw error;
         }
+    }
+
+    /**
+     * Met à jour la destination (source de vérité unique)
+     * @param {Object} params - Paramètres de la destination
+     * @param {string} params.text - Texte/adresse de la destination
+     * @param {Object} params.coords - Coordonnées {lat, lng}
+     * @param {string} params.source - Source de la mise à jour ('pill', 'panel', 'map')
+     */
+    updateDestination({ text = null, coords = null, source = '' }) {
+        console.log('🎯 updateDestination appelée:', { text, coords, source });
+        
+        // Mettre à jour l'état
+        if (text !== null) {
+            this.state.destinationText = text;
+        }
+        if (coords !== null) {
+            this.state.destinationCoords = coords;
+            this.state.destinationPoint = coords; // Compatibilité avec l'ancien code
+        }
+        
+        // Synchroniser les champs d'interface
+        this.syncDestinationInputs();
+        
+        // Mettre à jour le marqueur sur la carte si nécessaire
+        if (coords && this.mapManager) {
+            this.setStartPoint(coords);
+        }
+        
+        // Si on a une destination valide, afficher le sélecteur de type de parcours
+        if (text && text.length > 0) {
+            this.showRouteTypeSelector();
+            this.state.destinationSelected = true;
+        } else if (!text || text.length === 0) {
+            this.hideRouteTypeSelector();
+            this.state.destinationSelected = false;
+        }
+        
+        console.log('✅ Destination mise à jour:', this.state.destinationText, this.state.destinationCoords);
+    }
+    
+    /**
+     * Synchronise les champs de saisie avec l'état de la destination
+     */
+    syncDestinationInputs() {
+        const destinationSearch = document.getElementById('destinationSearch');
+        const destinationAddress = document.getElementById('destinationAddress');
+        const searchPlaceholder = document.querySelector('.search-placeholder');
+        const cityMapperInput = document.getElementById('sheetSearchInput');
+        
+        const text = this.state.destinationText || '';
+        
+        // Synchroniser la pill flottante (si elle existe)
+        if (destinationSearch) {
+            destinationSearch.value = text;
+        }
+        
+        // Synchroniser le champ du panneau (si il existe)
+        if (destinationAddress) {
+            destinationAddress.value = text;
+            
+            // Gérer la visibilité du placeholder vs input
+            if (text) {
+                destinationAddress.style.display = 'block';
+                if (searchPlaceholder) {
+                    searchPlaceholder.style.display = 'none';
+                }
+            } else {
+                // Si pas de texte, afficher le placeholder
+                if (searchPlaceholder) {
+                    destinationAddress.style.display = 'none';
+                    searchPlaceholder.style.display = 'flex';
+                }
+            }
+        }
+        
+        // Synchroniser le champ de CityMapperBottomSheet
+        if (cityMapperInput) {
+            cityMapperInput.value = text;
+            // Gérer le bouton clear
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (clearBtn) {
+                clearBtn.style.display = text ? 'flex' : 'none';
+            }
+        }
+        
+        console.log('🔄 Inputs synchronisés avec:', text);
+    }
+    
+    /**
+     * Obtient la destination actuelle
+     * @returns {Object} État de la destination {text, coords}
+     */
+    getDestination() {
+        return {
+            text: this.state.destinationText,
+            coords: this.state.destinationCoords
+        };
     }
 
     /**
@@ -112,6 +214,16 @@ export class UIManager {
             settingsBtn: this.elements.settingsBtn  // Bouton settings
         };
         this.panelManager = new PanelManager(panelElements);
+        
+        // Ajouter un callback pour la fermeture du panneau
+        if (this.panelManager && this.elements.mainPanel) {
+            const originalCloseMainPanel = this.panelManager.closeMainPanel.bind(this.panelManager);
+            this.panelManager.closeMainPanel = () => {
+                originalCloseMainPanel();
+                // Synchroniser les inputs lors de la fermeture
+                this.syncDestinationInputs();
+            };
+        }
         
         // Gestionnaire des résultats
         const resultsElements = {
@@ -186,6 +298,9 @@ export class UIManager {
 
         // Nouveau flux de destination
         this.setupDestinationFlow();
+        
+        // Synchronisation bidirectionnelle des champs de destination
+        this.setupDestinationSync();
 
         // Contrôles de parcours
         this.addEventListenerSafe('returnToStart', 'change', (e) => this.formManager.handleReturnToStartToggle(e.target.checked));
@@ -841,6 +956,13 @@ export class UIManager {
         // Reset de l'état
         this.state.startPoint = null;
         this.state.endPoint = null;
+        this.state.destinationText = '';
+        this.state.destinationCoords = null;
+        this.state.destinationPoint = null;
+        this.state.destinationSelected = false;
+        
+        // Synchroniser les champs vides
+        this.syncDestinationInputs();
         
         // Reset de la carte
         this.mapManager.reset();
@@ -985,40 +1107,94 @@ export class UIManager {
      */
     setupMapCallbacks() {
         // Callback pour les clics sur la carte
-        this.mapManager.setMapClickHandler((latlng) => {
-            if (!this.state.startPoint) {
-                this.setStartPoint(latlng);
-            } else if (!this.state.endPoint && !this.state.returnToStart) {
-                this.setEndPoint(latlng);
-            } else {
-                // Remplacer le point de départ
-                this.setStartPoint(latlng);
+        this.mapManager.setMapClickHandler(async (latlng) => {
+            console.log('🗺️ Clic sur la carte:', latlng);
+            
+            // Vérifier si CityMapperBottomSheet est ouvert
+            const cityMapperSheet = window.cityMapperSheet;
+            if (cityMapperSheet && cityMapperSheet.state && cityMapperSheet.state.isOpen) {
+                console.log('🚫 Clic sur carte ignoré - CityMapperBottomSheet est ouvert');
+                return;
+            }
+            
+            // Vérifier si un overlay est visible
+            const mapOverlay = document.getElementById('mapOverlay');
+            if (mapOverlay && mapOverlay.classList.contains('show')) {
+                console.log('🚫 Clic sur carte ignoré - Overlay actif');
+                return;
+            }
+            
+            try {
+                // Obtenir l'adresse via reverse geocoding
+                let address = null;
+                if (this.apiService && this.apiService.reverseGeocode) {
+                    address = await this.apiService.reverseGeocode(latlng.lat, latlng.lng);
+                }
+                
+                // Si pas d'adresse, utiliser les coordonnées formatées
+                if (!address) {
+                    address = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+                }
+                
+                // Mettre à jour la destination via la source de vérité unique
+                this.updateDestination({
+                    text: address,
+                    coords: latlng,
+                    source: 'map'
+                });
+                
+                console.log('✅ Destination définie depuis la carte:', address);
+                
+            } catch (error) {
+                console.error('Erreur lors du clic sur la carte:', error);
+                // En cas d'erreur, utiliser les coordonnées
+                const fallbackAddress = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+                this.updateDestination({
+                    text: fallbackAddress,
+                    coords: latlng,
+                    source: 'map'
+                });
             }
         });
 
         // Callback pour le déplacement des marqueurs
-        this.mapManager.setMarkerMoveHandler((type, latlng) => {
-            if (type === 'start') {
-                if (latlng) {
-                    this.state.startPoint = latlng;
-                    this.updateAddressField(latlng, 'destinationAddress');
-                } else {
-                    this.state.startPoint = null;
-                    if (this.elements.destinationAddress) {
-                        this.elements.destinationAddress.value = '';
+        this.mapManager.setMarkerMoveHandler(async (type, latlng) => {
+            if (type === 'start' && latlng) {
+                console.log('🎯 Marqueur de départ déplacé:', latlng);
+                
+                try {
+                    // Obtenir l'adresse pour le nouveau point
+                    let address = null;
+                    if (this.apiService && this.apiService.reverseGeocode) {
+                        address = await this.apiService.reverseGeocode(latlng.lat, latlng.lng);
                     }
-                }
-            } else if (type === 'end') {
-                if (latlng) {
-                    this.state.endPoint = latlng;
-                    this.updateAddressField(latlng, 'endAddress');
-                } else {
-                    this.state.endPoint = null;
-                    if (this.elements.endAddress) {
-                        this.elements.endAddress.value = '';
+                    
+                    if (!address) {
+                        address = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
                     }
+                    
+                    // Mettre à jour via la source de vérité unique
+                    this.updateDestination({
+                        text: address,
+                        coords: latlng,
+                        source: 'map'
+                    });
+                    
+                } catch (error) {
+                    console.error('Erreur déplacement marqueur:', error);
+                    const fallbackAddress = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+                    this.updateDestination({
+                        text: fallbackAddress,
+                        coords: latlng,
+                        source: 'map'
+                    });
                 }
+            } else if (type === 'end' && latlng) {
+                // Gérer le marqueur de fin si nécessaire
+                this.state.endPoint = latlng;
+                this.updateAddressField(latlng, 'endAddress');
             }
+            
             this.updateRouteInfo();
         });
     }
@@ -1307,16 +1483,73 @@ export class UIManager {
         if (!destinationValue) return;
 
         if (type === 'loop') {
-            // Mode boucle : destination = waypoint, départ = géolocation, retour au départ
+            // Mode boucle : destination = waypoint, départ = géolocalisation, retour au départ
             this.state.returnToStart = true;
             console.log('🔄 Mode boucle activé - retour au point de départ');
         } else {
-            // Mode aller-simple : destination = point d'arrivée, départ = géolocation
+            // Mode aller-simple : destination = point d'arrivée, départ = géolocalisation
             this.state.returnToStart = false;
             console.log('➡️ Mode aller-simple activé');
         }
         
         // Marquer la destination comme sélectionnée
         this.state.destinationSelected = true;
+    }
+    
+    /**
+     * Configure la synchronisation bidirectionnelle des champs de destination
+     */
+    setupDestinationSync() {
+        const destinationSearch = document.getElementById('destinationSearch');
+        const destinationAddress = this.elements.destinationAddress;
+        
+        // Synchroniser lors de la saisie dans la pill flottante
+        if (destinationSearch) {
+            // Utiliser un debounce pour éviter trop d'appels
+            let syncTimeout;
+            destinationSearch.addEventListener('input', (e) => {
+                clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(() => {
+                    const text = e.target.value.trim();
+                    // Ne mettre à jour que le texte, pas les coords (sera fait lors de la sélection)
+                    if (text !== this.state.destinationText) {
+                        this.updateDestination({
+                            text: text,
+                            coords: null,
+                            source: 'pill'
+                        });
+                    }
+                }, 500);
+            });
+        }
+        
+        // Synchroniser lors de la saisie manuelle dans le panneau
+        if (destinationAddress) {
+            let syncTimeout;
+            destinationAddress.addEventListener('input', (e) => {
+                clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(() => {
+                    const text = e.target.value.trim();
+                    // Ne mettre à jour que le texte si c'est une saisie manuelle
+                    if (text !== this.state.destinationText && !e.target.hasAttribute('data-place-selected')) {
+                        this.updateDestination({
+                            text: text,
+                            coords: null,
+                            source: 'panel'
+                        });
+                    }
+                }, 500);
+            });
+            
+            // Marquer quand une sélection Google Places est faite
+            destinationAddress.addEventListener('place_changed', () => {
+                destinationAddress.setAttribute('data-place-selected', 'true');
+                setTimeout(() => {
+                    destinationAddress.removeAttribute('data-place-selected');
+                }, 1000);
+            });
+        }
+        
+        console.log('🔄 Synchronisation bidirectionnelle des champs configurée');
     }
 }

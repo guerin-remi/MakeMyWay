@@ -315,8 +315,7 @@ export class FloatingSearchManager {
     async selectPlace(placeId, description) {
         try {
             this.hideSuggestions();
-            this.elements.destinationSearch.value = description;
-
+            
             // Obtenir les détails du lieu
             const placeDetails = await this.apiService.getPlaceDetails(placeId);
             
@@ -326,8 +325,18 @@ export class FloatingSearchManager {
                     lng: placeDetails.geometry.location.lng()
                 };
 
-                // Centrer la carte et ajouter le repère
-                await this.setDestination(location, description);
+                // Utiliser UIManager pour la synchronisation si disponible
+                if (this.uiManager && this.uiManager.updateDestination) {
+                    this.uiManager.updateDestination({
+                        text: description,
+                        coords: location,
+                        source: 'pill'
+                    });
+                } else {
+                    // Fallback : comportement existant
+                    this.elements.destinationSearch.value = description;
+                    await this.setDestination(location, description);
+                }
                 
                 // Événement de tracking
                 this.trackEvent('place_selected', { 
@@ -361,7 +370,18 @@ export class FloatingSearchManager {
                     lng: results[0].geometry.location.lng()
                 };
                 
-                await this.setDestination(location, results[0].formatted_address);
+                // Utiliser UIManager pour la synchronisation si disponible
+                if (this.uiManager && this.uiManager.updateDestination) {
+                    this.uiManager.updateDestination({
+                        text: results[0].formatted_address,
+                        coords: location,
+                        source: 'pill'
+                    });
+                } else {
+                    // Fallback
+                    await this.setDestination(location, results[0].formatted_address);
+                }
+                
                 this.trackEvent('place_selected', { 
                     query, 
                     source: 'direct_search' 

@@ -148,10 +148,7 @@ export class CityMapperBottomSheet {
                         <div class="distance-config">
                             <div class="distance-header">
                                 <span class="distance-label">Distance du parcours</span>
-                                <span>
-                                    <span class="distance-value" id="distanceValue">5</span>
-                                    <span class="distance-unit">km</span>
-                                </span>
+                                <span class="distance-value" id="cityMapperDistanceValue">5 km</span>
                             </div>
                             <input type="range" 
                                    class="distance-slider" 
@@ -218,6 +215,10 @@ export class CityMapperBottomSheet {
         `;
         
         document.body.appendChild(bottomSheet);
+        
+        // Vérifier immédiatement après création que l'élément existe
+        const checkElement = document.getElementById('cityMapperDistanceValue');
+        console.log('🔍 Vérification après création DOM - cityMapperDistanceValue existe:', !!checkElement, checkElement);
     }
     
     cacheElements() {
@@ -233,7 +234,7 @@ export class CityMapperBottomSheet {
             // Configuration
             transportModes: document.getElementById('transportModes'),
             distanceSlider: document.getElementById('distanceSlider'),
-            distanceValue: document.getElementById('distanceValue'),
+            distanceValue: document.getElementById('cityMapperDistanceValue'),
             minDistance: document.getElementById('minDistance'),
             maxDistance: document.getElementById('maxDistance'),
             returnToStartOption: document.getElementById('returnToStartOption'),
@@ -248,6 +249,21 @@ export class CityMapperBottomSheet {
             floatingSearch: document.querySelector('.search-pill'),
             floatingInput: document.querySelector('.search-pill-input')
         };
+        
+        // DEBUG: Vérifier que les éléments critiques sont trouvés
+        console.log('📋 Éléments slider trouvés:', {
+            distanceSlider: !!this.elements.distanceSlider,
+            distanceValue: !!this.elements.distanceValue,
+            sliderValue: this.elements.distanceSlider?.value,
+            valueText: this.elements.distanceValue?.textContent
+        });
+        
+        if (!this.elements.distanceSlider) {
+            console.error('❌ distanceSlider (id="distanceSlider") non trouvé!');
+        }
+        if (!this.elements.distanceValue) {
+            console.error('❌ distanceValue (id="distanceValue") non trouvé!');
+        }
     }
     
     setupTouchEvents() {
@@ -275,9 +291,20 @@ export class CityMapperBottomSheet {
         // Overlay pour fermer
         this.elements.mapOverlay.addEventListener('touchstart', (e) => {
             console.log('📱 Touch sur overlay - fermeture');
+            e.preventDefault();
             e.stopPropagation();
             this.close();
         }, { passive: false });
+        
+        // Gérer aussi les clics pour desktop
+        this.elements.mapOverlay.addEventListener('click', (e) => {
+            console.log('🖱️ Click sur overlay - fermeture');
+            e.preventDefault();
+            e.stopPropagation();
+            if (!('ontouchstart' in window)) {
+                this.close();
+            }
+        });
         
         // Gestion du glissement (drag) de la poignée
         this.setupDragHandle();
@@ -296,8 +323,21 @@ export class CityMapperBottomSheet {
             });
         });
         
-        // Slider de distance
+        // Slider de distance - Événements pour mobile et desktop
         this.elements.distanceSlider.addEventListener('input', (e) => {
+            console.log('📏 Slider input:', e.target.value);
+            this.updateDistance(e.target.value);
+        });
+        
+        // Pour mobile, ajouter aussi touchmove pour une meilleure réactivité
+        this.elements.distanceSlider.addEventListener('touchmove', (e) => {
+            console.log('📏 Slider touchmove:', e.target.value);
+            this.updateDistance(e.target.value);
+        }, { passive: true });
+        
+        // Et change pour être sûr de capturer la valeur finale
+        this.elements.distanceSlider.addEventListener('change', (e) => {
+            console.log('📏 Slider change:', e.target.value);
             this.updateDistance(e.target.value);
         });
         
@@ -362,6 +402,22 @@ export class CityMapperBottomSheet {
         this.elements.searchInput.addEventListener('input', () => {
             const value = this.elements.searchInput.value;
             this.elements.clearBtn.style.display = value ? 'flex' : 'none';
+            
+            // SYNCHRONISATION: Mettre à jour UIManager lors de la saisie manuelle
+            if (this.uiManager && this.uiManager.updateDestination) {
+                // Utiliser un debounce pour éviter trop d'appels
+                clearTimeout(this.syncTimeout);
+                this.syncTimeout = setTimeout(() => {
+                    // Ne mettre à jour que le texte, pas les coords (sera fait lors de la sélection)
+                    if (value !== this.uiManager.getDestination().text) {
+                        this.uiManager.updateDestination({
+                            text: value,
+                            coords: null,
+                            source: 'citymapper'
+                        });
+                    }
+                }, 500);
+            }
             
             if (value.length >= 3) {
                 this.handleAutocomplete(value);
@@ -477,9 +533,57 @@ export class CityMapperBottomSheet {
     }
     
     updateDistance(value) {
+        console.log('🎯 updateDistance appelé avec:', value);
+        
         this.state.distance = parseFloat(value);
-        this.elements.distanceValue.textContent = value;
-        this.elements.distanceSlider.value = value;
+        const displayValue = `${value} km`;
+        
+        // Utiliser le BON ID spécifique au CityMapperBottomSheet
+        const distanceEl = document.getElementById('cityMapperDistanceValue');
+        
+        if (distanceEl) {
+            // Mise à jour simple et directe
+            distanceEl.textContent = displayValue;
+            distanceEl.innerHTML = displayValue;
+            
+            console.log('✅ Distance mise à jour dans CityMapper:', displayValue);
+            console.log('✅ Element:', distanceEl);
+            
+            // Cache
+            if (!this.elements.distanceValue) {
+                this.elements.distanceValue = distanceEl;
+            }
+        } else {
+            console.error('❌ Element cityMapperDistanceValue introuvable!');
+            
+            // Fallback: chercher dans le bottom sheet par classe
+            const inBottomSheet = document.querySelector('#cityMapperSheet .distance-value');
+            if (inBottomSheet) {
+                inBottomSheet.textContent = displayValue;
+                inBottomSheet.innerHTML = displayValue;
+                console.log('✅ Mise à jour par fallback classe:', inBottomSheet);
+            }
+        }
+        
+        // Mettre à jour la position du slider
+        if (this.elements.distanceSlider) {
+            this.elements.distanceSlider.value = value;
+        } else {
+            const slider = document.getElementById('distanceSlider');
+            if (slider) {
+                slider.value = value;
+            }
+        }
+        
+        // Mettre à jour aussi les limites min/max si elles existent
+        if (this.elements.minDistance) {
+            const min = this.elements.distanceSlider?.min || 1;
+            this.elements.minDistance.textContent = `${min} km`;
+        }
+        if (this.elements.maxDistance) {
+            const max = this.elements.distanceSlider?.max || 15;
+            this.elements.maxDistance.textContent = `${max} km`;
+        }
         
         // Synchroniser avec l'UIManager
         if (this.uiManager) {
@@ -522,6 +626,18 @@ export class CityMapperBottomSheet {
     open() {
         console.log('🎬 Ouverture du bottom sheet avec config parcours');
         
+        // SYNCHRONISATION: Récupérer la destination depuis UIManager
+        if (this.uiManager && this.uiManager.getDestination) {
+            const destination = this.uiManager.getDestination();
+            if (destination.text) {
+                this.elements.searchInput.value = destination.text;
+                this.elements.clearBtn.style.display = 'flex';
+            }
+            if (destination.coords) {
+                this.state.destination = destination.coords;
+            }
+        }
+        
         // Masquer la barre de recherche flottante
         if (this.elements.floatingSearch) {
             this.elements.floatingSearch.style.opacity = '0';
@@ -550,6 +666,11 @@ export class CityMapperBottomSheet {
     
     close() {
         console.log('🎬 Fermeture du bottom sheet');
+        
+        // SYNCHRONISATION: Synchroniser l'état avant de fermer
+        if (this.uiManager && this.uiManager.syncDestinationInputs) {
+            this.uiManager.syncDestinationInputs();
+        }
         
         // Réafficher la barre de recherche flottante
         if (this.elements.floatingSearch) {
@@ -721,7 +842,7 @@ export class CityMapperBottomSheet {
     async selectLocation(place) {
         console.log('📍 Lieu sélectionné:', place);
         
-        // Mettre à jour l'input
+        // Mettre à jour l'input local
         this.elements.searchInput.value = place.name;
         this.elements.clearBtn.style.display = 'flex';
         
@@ -750,9 +871,18 @@ export class CityMapperBottomSheet {
             this.state.destination = coords;
             this.state.useCurrentLocation = false;
             
-            // Placer le marqueur sur la carte
-            this.mapManager.setMarker(coords, 'end');
-            this.mapManager.centerOnLocation(coords);
+            // SYNCHRONISATION: Utiliser UIManager pour la source de vérité unique
+            if (this.uiManager && this.uiManager.updateDestination) {
+                this.uiManager.updateDestination({
+                    text: place.name || place.address,
+                    coords: coords,
+                    source: 'citymapper'
+                });
+            } else {
+                // Fallback: comportement original
+                this.mapManager.setMarker(coords, 'end');
+                this.mapManager.centerOnLocation(coords);
+            }
             
             // Sauvegarder dans les recherches récentes
             this.saveRecentSearch(place);
@@ -851,6 +981,16 @@ export class CityMapperBottomSheet {
         this.hideSuggestions();
         this.state.destination = null;
         this.state.useCurrentLocation = false;
+        
+        // SYNCHRONISATION: Effacer aussi dans UIManager
+        if (this.uiManager && this.uiManager.updateDestination) {
+            this.uiManager.updateDestination({
+                text: '',
+                coords: null,
+                source: 'citymapper'
+            });
+        }
+        
         this.updateGenerateButton();
     }
     
