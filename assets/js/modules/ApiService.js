@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import logger from '../logger.js';
 
 /**
  * Service de gestion des appels API Google Maps
@@ -7,6 +8,7 @@ import { CONFIG } from '../config.js';
 export class ApiService {
     constructor() {
         this.cache = new Map();
+        // Logger minimal
         this.setupCacheCleanup();
         
         // Initialiser les services Google Maps
@@ -70,9 +72,14 @@ export class ApiService {
      * @returns {Promise<string|null>} Adresse formatée ou null
      */
     async reverseGeocode(lat, lng) {
+        // Garde-fou API minimal
+        if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+            logger.warn('API', 'reverseGeocode invalid args', { lat, lng });
+            return null;
+        }
+
         // Si Google Maps n'est pas disponible
         if (!this.geocoder) {
-            console.warn('⚠️ Google Geocoder non disponible');
             return null;
         }
 
@@ -84,7 +91,6 @@ export class ApiService {
         }
 
         try {
-            console.log(`🌍 Géocodage inversé Google Maps: ${lat}, ${lng}`);
 
             // Effectuer la requête de géocodage inversé
             const result = await new Promise((resolve, reject) => {
@@ -115,6 +121,8 @@ export class ApiService {
                 if (streetAddress) {
                     address = streetAddress.formatted_address;
                 }
+
+                // Adresse extraite
             }
 
             // Mettre en cache
@@ -123,7 +131,6 @@ export class ApiService {
             return address;
 
         } catch (error) {
-            console.warn('Erreur géocodage inversé Google Maps:', error);
             return null;
         }
     }

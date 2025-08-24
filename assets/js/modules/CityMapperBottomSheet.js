@@ -419,11 +419,7 @@ export class CityMapperBottomSheet {
                 }, 500);
             }
             
-            if (value.length >= 3) {
-                this.handleAutocomplete(value);
-            } else {
-                this.hideSuggestions();
-            }
+            // La logique d'autocomplete est déjà gérée plus bas
             
             // Activer/désactiver le bouton générer
             this.updateGenerateButton();
@@ -722,7 +718,7 @@ export class CityMapperBottomSheet {
                 };
                 
                 // Géocoder pour obtenir l'adresse
-                const address = await this.apiService.reverseGeocode(coords);
+                const address = await this.apiService.reverseGeocode(coords.lat, coords.lng);
                 
                 // Mettre à jour l'input
                 this.elements.searchInput.value = address || 'Position actuelle';
@@ -730,8 +726,8 @@ export class CityMapperBottomSheet {
                 this.state.useCurrentLocation = true;
                 
                 // Placer le marqueur sur la carte
-                this.mapManager.setMarker(coords, 'start');
-                this.mapManager.centerOnLocation(coords);
+                this.mapManager.setStartMarker(coords);
+                this.mapManager.centerOn(coords, 15);
                 
                 // Synchroniser avec UIManager
                 if (this.uiManager) {
@@ -880,8 +876,8 @@ export class CityMapperBottomSheet {
                 });
             } else {
                 // Fallback: comportement original
-                this.mapManager.setMarker(coords, 'end');
-                this.mapManager.centerOnLocation(coords);
+                this.mapManager.setEndMarker(coords);
+                this.mapManager.centerOn(coords, 15);
             }
             
             // Sauvegarder dans les recherches récentes

@@ -1,4 +1,5 @@
 import { CONFIG, ConfigUtils } from '../config.js';
+import logger from '../logger.js';
 import { POIManager } from './ui/POIManager.js';
 import { PanelManager } from './ui/PanelManager.js';
 import { ResultsManager } from './ui/ResultsManager.js';
@@ -14,6 +15,7 @@ export class UIManager {
         this.mapManager = mapManager;
         this.routeGenerator = routeGenerator;
         this.authUI = authUI;
+        // Logger minimal supprimé pour revenir au système original
         this.elements = {};
         this.state = {
             destinationPoint: null,
@@ -548,12 +550,15 @@ export class UIManager {
      * @param {Object} latlng - Position {lat, lng}
      */
     setStartPoint(latlng) {
+        logger.debug('UI', 'setStartPoint', { lat: latlng?.lat, lng: latlng?.lng });
         this.state.startPoint = latlng;
         this.mapManager.setStartMarker(latlng);
         this.updateAddressField(latlng, 'destinationAddress');
         this.updateRouteInfo();
-        console.log('📍 Point de départ défini:', latlng);
         
+        // Maintenir la compatibilité avec l'ancienne logique de destination
+        this.state.destinationPoint = latlng;
+        this.state.destinationCoords = latlng;
     }
 
     /**
@@ -561,11 +566,11 @@ export class UIManager {
      * @param {Object} latlng - Position {lat, lng}
      */
     setEndPoint(latlng) {
+        logger.debug('UI', 'setEndPoint', { lat: latlng?.lat, lng: latlng?.lng });
         this.state.endPoint = latlng;
         this.mapManager.setEndMarker(latlng);
         this.updateAddressField(latlng, 'endAddress');
         this.updateRouteInfo();
-        console.log('🏁 Point d\'arrivée défini:', latlng);
     }
 
     /**
@@ -770,9 +775,16 @@ export class UIManager {
      * Génère un nouveau parcours
      */
     async generateRoute() {
+        logger.debug('UI', 'Génération de route demandée', { 
+            distance: this.state.targetDistance, 
+            mode: this.state.currentMode,
+            hasStart: !!this.state.startPoint 
+        });
+        
         if (this.state.isLoading) return;
 
         if (!this.state.startPoint) {
+            logger.warn('UI', 'Génération interrompue - pas de point de départ');
             this.showError(CONFIG.MESSAGES.ERRORS.NO_START_POINT);
             return;
         }
@@ -1108,7 +1120,7 @@ export class UIManager {
     setupMapCallbacks() {
         // Callback pour les clics sur la carte
         this.mapManager.setMapClickHandler(async (latlng) => {
-            console.log('🗺️ Clic sur la carte:', latlng);
+            logger.debug('UI', 'Clic sur la carte', latlng);
             
             // Vérifier si CityMapperBottomSheet est ouvert
             const cityMapperSheet = window.cityMapperSheet;

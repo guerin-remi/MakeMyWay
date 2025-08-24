@@ -1,0 +1,20 @@
+{
+  "name": "makemyway-frontend",
+  "version": "1.0.0",
+  "description": "MakeMyWay - Progressive Web App pour générer des parcours sportifs personnalisés",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "python -m http.server 8000",
+    "dev:alt": "npx http-server -p 8000"
+  },
+  "devDependencies": {
+    "vitest": "^1.2.0",
+    "jsdom": "^23.2.0",
+    "@vitest/coverage-v8": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

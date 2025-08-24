@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import logger from '../logger.js';
 
 /**
  * Gestionnaire de la carte Google Maps et des interactions cartographiques
@@ -6,6 +7,7 @@ import { CONFIG } from '../config.js';
 export class MapManager {
     constructor(apiService) {
         this.apiService = apiService;
+        // Logger minimal remplace l'ancien système
         this.map = null;
         this.markers = {
             start: null,
@@ -23,6 +25,8 @@ export class MapManager {
      * @returns {Promise<void>}
      */
     async initialize(containerId = 'map') {
+        logger.debug('MAP', 'initialize', { containerId });
+        
         // Vérifier que Google Maps est chargé
         if (typeof google === 'undefined' || !google.maps) {
             throw new Error('Google Maps API n\'est pas chargée');
@@ -74,7 +78,7 @@ export class MapManager {
             // Configurer les événements
             this.setupMapEvents();
             
-            console.log('[MAP] Carte Google Maps initialisée');
+            logger.debug('MAP', 'initialize complete');
 
             // Initialiser le Places Service dans ApiService si disponible
             if (this.apiService && this.apiService.initializePlacesService) {
@@ -82,7 +86,7 @@ export class MapManager {
             }
 
         } catch (error) {
-            console.error('Erreur initialisation carte Google Maps:', error);
+            logger.error('MAP', 'initialize failed', error);
             throw error;
         }
     }
@@ -148,6 +152,8 @@ export class MapManager {
      * @param {Object} latlng - Position {lat, lng}
      */
     setStartMarker(latlng) {
+        logger.debug('MAP', 'setStartMarker', { lat: latlng.lat, lng: latlng.lng });
+        
         // Supprimer l'ancien marqueur
         this.removeStartMarker();
 
@@ -190,10 +196,10 @@ export class MapManager {
                 lat: e.latLng.lat(),
                 lng: e.latLng.lng()
             };
+            logger.debug('MAP', 'Marqueur de départ déplacé', newPos);
             if (this.onMarkerMove) {
                 this.onMarkerMove('start', newPos);
             }
-            console.log('📍 Point de départ déplacé:', newPos);
         });
 
         // Clic droit pour supprimer (desktop) et double tap (mobile)
@@ -247,6 +253,8 @@ export class MapManager {
      * @param {Object} latlng - Position {lat, lng}
      */
     setEndMarker(latlng) {
+        logger.debug('MAP', 'setEndMarker', { lat: latlng.lat, lng: latlng.lng });
+        
         // Supprimer l'ancien marqueur
         this.removeEndMarker();
 
@@ -289,10 +297,10 @@ export class MapManager {
                 lat: e.latLng.lat(),
                 lng: e.latLng.lng()
             };
+            logger.debug('MAP', 'Marqueur d\'arrivée déplacé', newPos);
             if (this.onMarkerMove) {
                 this.onMarkerMove('end', newPos);
             }
-            console.log('🏁 Point d\'arrivée déplacé:', newPos);
         });
 
         // Clic droit pour supprimer (desktop) et double tap (mobile)
@@ -508,7 +516,7 @@ export class MapManager {
         if (this.markers.start) {
             this.markers.start.setMap(null);
             this.markers.start = null;
-            console.log('🗑️ Marqueur de départ supprimé');
+            logger.debug('MAP', 'removeStartMarker');
         }
     }
 
@@ -519,7 +527,7 @@ export class MapManager {
         if (this.markers.end) {
             this.markers.end.setMap(null);
             this.markers.end = null;
-            console.log('🗑️ Marqueur d\'arrivée supprimé');
+            logger.debug('MAP', 'removeEndMarker');
         }
     }
 

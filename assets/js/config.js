@@ -3,6 +3,10 @@
  */
 
 export const CONFIG = {
+    // Flags pour développement et debugging
+    DEBUG: false,
+    LOG_LEVEL: 'info',
+
     // APIs
     GOOGLE_MAPS: {
         // Configuration Google Maps gérée dans index.html
